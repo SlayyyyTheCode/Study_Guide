@@ -55,6 +55,10 @@ export const claudeDriver: BrainDriver = {
         // override is needed.
         tools: [],
         maxTurns: 1,
+        // Fully isolate from the user's local Claude Code config so no
+        // filesystem settings or MCP servers leak into this completion call.
+        settingSources: [],
+        mcpServers: {},
       },
     });
     for await (const message of q) {

@@ -87,7 +87,10 @@ export function saveCanvas(db: DB, id: number, json: string): void {
   db.prepare("UPDATE workflows SET react_flow_json = ?, updated_at = datetime('now') WHERE id = ?").run(json, id);
 }
 export function deleteWorkflow(db: DB, id: number): void {
-  for (const t of ["files", "runs", "chat_messages", "pomodoro_blocks"])
-    db.prepare(`DELETE FROM ${t} WHERE workflow_id = ?`).run(id);
-  db.prepare("DELETE FROM workflows WHERE id = ?").run(id);
+  db.transaction((wfId: number) => {
+    db.prepare("DELETE FROM quiz_attempts WHERE run_id IN (SELECT id FROM runs WHERE workflow_id = ?)").run(wfId);
+    for (const t of ["files", "runs", "chat_messages", "pomodoro_blocks"])
+      db.prepare(`DELETE FROM ${t} WHERE workflow_id = ?`).run(wfId);
+    db.prepare("DELETE FROM workflows WHERE id = ?").run(wfId);
+  })(id);
 }

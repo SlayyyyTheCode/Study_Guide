@@ -101,6 +101,7 @@ Tables (indicative): `workflows` (id, name, react_flow_json, updated_at), `files
 - Git repo in this directory; remote: `https://github.com/SlayyyyTheCode/Study_Guide.git`.
 - README with one-command start: `npm install && npm run dev`.
 - Vercel: not used in v1 (Claude subscription cannot authenticate from cloud). UI kept deployable in case of a future API-key mode.
+- Repo is public-friendly: no credentials or user data committed (uploads/, SQLite, .env are gitignored). Anyone cloning it runs the app locally against **their own** Claude Code login or Ollama install.
 
 ## 11. Out of Scope (v2 backlog)
 

@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { getDriver } from "@/lib/brains";
-import type { ChatMsg } from "@/lib/brains/types";
+import type { BrainDriver, ChatMsg } from "@/lib/brains/types";
 import { CHAT_SYSTEM, buildChatContext } from "@/lib/prompts";
+import { sseResponse } from "@/lib/sse";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,19 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   const { workflowId, message, provider = "claude", model = "sonnet" } = await req.json();
+
+  // Validate the provider before touching the DB or starting the stream:
+  // unknown provider -> 400 JSON, and the user message is NOT persisted.
+  let driver: BrainDriver;
+  try {
+    driver = getDriver(provider);
+  } catch (e) {
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : String(e) },
+      { status: 400 }
+    );
+  }
+
   const db = getDb();
 
   const material = (db.prepare(
@@ -35,26 +49,14 @@ export async function POST(req: Request) {
 
   const system = `${CHAT_SYSTEM}\n\n${buildChatContext(material, recent)}`;
   const messages: ChatMsg[] = [...history, { role: "user", content: message }];
-  const driver = getDriver(provider);
 
-  const stream = new ReadableStream({
-    async start(controller) {
-      const enc = new TextEncoder();
-      const send = (obj: unknown) => controller.enqueue(enc.encode(`data: ${JSON.stringify(obj)}\n\n`));
-      let acc = "";
-      try {
-        for await (const chunk of driver.stream({ model, system, messages })) {
-          acc += chunk;
-          send({ type: "chunk", text: chunk });
-        }
-        db.prepare("INSERT INTO chat_messages (workflow_id, role, content) VALUES (?,?,?)").run(workflowId, "assistant", acc);
-        send({ type: "done" });
-      } catch (e) {
-        send({ type: "error", message: e instanceof Error ? e.message : String(e) });
-      }
-      send({ done: true });
-      controller.close();
-    },
+  return sseResponse(req, async send => {
+    let acc = "";
+    for await (const chunk of driver.stream({ model, system, messages })) {
+      acc += chunk;
+      send({ type: "chunk", text: chunk });
+    }
+    db.prepare("INSERT INTO chat_messages (workflow_id, role, content) VALUES (?,?,?)").run(workflowId, "assistant", acc);
+    send({ type: "done" });
   });
-  return new Response(stream, { headers: { "content-type": "text/event-stream", "cache-control": "no-cache" } });
 }

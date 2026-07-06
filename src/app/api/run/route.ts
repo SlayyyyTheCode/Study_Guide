@@ -1,5 +1,6 @@
 import { getDb, getWorkflow } from "@/lib/db";
 import { runOutputNode } from "@/lib/runner";
+import { sseResponse } from "@/lib/sse";
 
 export const dynamic = "force-dynamic";
 
@@ -10,20 +11,7 @@ export async function POST(req: Request) {
   if (!wf) return new Response("workflow not found", { status: 404 });
   const graph = JSON.parse(wf.react_flow_json);
 
-  const stream = new ReadableStream({
-    async start(controller) {
-      const enc = new TextEncoder();
-      const send = (obj: unknown) => controller.enqueue(enc.encode(`data: ${JSON.stringify(obj)}\n\n`));
-      try {
-        for await (const ev of runOutputNode(db, workflowId, graph, nodeId, { methodOptions })) send(ev);
-      } catch (e) {
-        send({ type: "error", message: e instanceof Error ? e.message : String(e) });
-      }
-      send({ done: true });
-      controller.close();
-    },
-  });
-  return new Response(stream, {
-    headers: { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive" },
+  return sseResponse(req, async send => {
+    for await (const ev of runOutputNode(db, workflowId, graph, nodeId, { methodOptions })) send(ev);
   });
 }

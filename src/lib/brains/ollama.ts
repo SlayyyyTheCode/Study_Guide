@@ -36,19 +36,37 @@ export const ollamaDriver: BrainDriver = {
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buf = "";
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buf += decoder.decode(value, { stream: true });
-      let nl;
-      while ((nl = buf.indexOf("\n")) >= 0) {
-        const line = buf.slice(0, nl).trim();
-        buf = buf.slice(nl + 1);
-        if (!line) continue;
-        const obj = JSON.parse(line);
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        let nl;
+        while ((nl = buf.indexOf("\n")) >= 0) {
+          const line = buf.slice(0, nl).trim();
+          buf = buf.slice(nl + 1);
+          if (!line) continue;
+          const obj = JSON.parse(line);
+          const chunk = obj?.message?.content;
+          if (chunk) yield chunk as string;
+        }
+      }
+      // Flush the decoder and handle a final line without a trailing newline.
+      buf += decoder.decode();
+      const rest = buf.trim();
+      if (rest) {
+        let obj;
+        try {
+          obj = JSON.parse(rest);
+        } catch {
+          throw new Error("Ollama stream ended mid-line");
+        }
         const chunk = obj?.message?.content;
         if (chunk) yield chunk as string;
       }
+    } finally {
+      // Release the stream on early exit (consumer break) or error paths.
+      await reader.cancel().catch(() => {});
     }
   },
 };

@@ -29,4 +29,20 @@ describe("ollama driver", () => {
       chunks.push(c);
     expect(chunks.join("")).toBe("Hello");
   });
+  it("yields a final line that lacks a trailing newline", async () => {
+    const body = JSON.stringify({ message: { content: "Hel" } }) + "\n" + JSON.stringify({ message: { content: "lo" } });
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(body, { status: 200 })));
+    const chunks: string[] = [];
+    for await (const c of ollamaDriver.stream({ model: "m", system: "s", messages: [{ role: "user", content: "hi" }] }))
+      chunks.push(c);
+    expect(chunks.join("")).toBe("Hello");
+  });
+  it("throws when the stream ends mid-line", async () => {
+    const body = JSON.stringify({ message: { content: "Hel" } }) + "\n" + '{"message":{"content":"lo';
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(body, { status: 200 })));
+    const run = async () => {
+      for await (const _ of ollamaDriver.stream({ model: "m", system: "s", messages: [{ role: "user", content: "hi" }] })) void _;
+    };
+    await expect(run()).rejects.toThrow(/mid-line/);
+  });
 });

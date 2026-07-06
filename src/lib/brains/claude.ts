@@ -3,7 +3,7 @@ import { exec } from "child_process";
 import type { BrainDriver, StreamOpts } from "./types";
 
 const MODELS = ["sonnet", "opus", "haiku"];
-const HINT = "Claude Code CLI not available or not logged in. Install Claude Code and run `claude` once to log in with your subscription.";
+const HINT = "Claude Code CLI not found. Install it and run `claude` once to log in with your subscription.";
 
 function buildPrompt(opts: StreamOpts): string | AsyncIterable<SDKUserMessage> {
   const last = opts.messages[opts.messages.length - 1];
@@ -49,10 +49,12 @@ export const claudeDriver: BrainDriver = {
       options: {
         model: opts.model,
         systemPrompt: opts.system,
-        allowedTools: [],
+        // Pure text-in/text-out completion: `tools: []` disables ALL built-in
+        // tools (allowedTools only controls auto-approval, not availability).
+        // With no tools there is nothing to permission, so no permissionMode
+        // override is needed.
+        tools: [],
         maxTurns: 1,
-        permissionMode: "bypassPermissions",
-        allowDangerouslySkipPermissions: true,
       },
     });
     for await (const message of q) {

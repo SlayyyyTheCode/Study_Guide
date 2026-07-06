@@ -67,7 +67,9 @@ export async function* runOutputNode(
       .run(acc, JSON.stringify(thread), runId);
     yield { type: "done", runId };
   } catch (e) {
-    db.prepare("UPDATE runs SET status='error', result_md=? WHERE id=?").run(acc, runId);
+    const thread = [{ role: "user", content: prompt.user }, { role: "assistant", content: acc }];
+    db.prepare("UPDATE runs SET status='error', result_md=?, thread_json=? WHERE id=?")
+      .run(acc, JSON.stringify(thread), runId);
     yield { type: "error", message: e instanceof Error ? e.message : String(e) };
   }
 }

@@ -1,0 +1,8 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0f1115; --panel: #171a21; --border: #2a2f3a; --text: #e6e8ee; --muted: #9aa3b2;
+  --blue: #4a90d9; --purple: #b07ad9; --green: #4dab6d; --red: #e05d44; --amber: #d9a441;
+}
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--text); font: 14px/1.5 system-ui, "Segoe UI", sans-serif; }
+button { font: inherit; cursor: pointer; }

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { useApp, readSse } from "@/store";
 
@@ -19,14 +19,19 @@ export default function ResultPanel() {
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [quizAnswers, setQuizAnswers] = useState<Record<number, string>>({});
+  const abortRef = useRef<AbortController | null>(null);
+  const openRunRef = useRef<number | null>(null);
+  openRunRef.current = openRunId;
 
   useEffect(() => {
     if (!openRunId) return;
-    setThread([]); setQuizAnswers({}); setLoading(true);
+    setThread([]); setQuizAnswers({}); setLoading(true); setBusy(false);
     fetch(`/api/runs/${openRunId}`)
       .then(r => r.json())
-      .then(run => setThread(JSON.parse(run.thread_json)))
+      .then(run => { if (openRunRef.current === openRunId) setThread(JSON.parse(run.thread_json)); })
       .finally(() => setLoading(false));
+    // Abort any in-flight reply stream when the open run changes or the panel unmounts.
+    return () => { abortRef.current?.abort(); abortRef.current = null; };
   }, [openRunId]);
 
   useEffect(() => {
@@ -36,33 +41,70 @@ export default function ResultPanel() {
     return () => window.removeEventListener("keydown", onKey);
   }, [openRunId, setOpenRunId]);
 
+  // Derive the quiz from the LAST assistant message containing a ```json array
+  // block, so "Retry misses" swaps the form to the newly generated question set.
+  const quizSrc = useMemo(() => {
+    if (openMethod !== "quiz") return null;
+    for (let i = thread.length - 1; i >= 1; i--) {
+      if (thread[i].role !== "assistant") continue;
+      const q = parseQuiz(thread[i].content);
+      if (q) return { idx: i, quiz: q };
+    }
+    return null;
+  }, [openMethod, thread]);
+  const quizIdx = quizSrc?.idx ?? -1;
+  useEffect(() => { setQuizAnswers({}); }, [quizIdx]);
+
   if (!openRunId) return null;
-  const quiz = openMethod === "quiz" && thread.length >= 2 ? parseQuiz(thread[1].content) : null;
+  const quiz = quizSrc?.quiz ?? null;
 
   async function send(message: string) {
+    const runId = openRunId;
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
     setBusy(true);
     setThread(t => [...t, { role: "user", content: message }, { role: "assistant", content: "" }]);
-    const res = await fetch(`/api/runs/${openRunId}/reply`, {
-      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ message }),
-    });
     let acc = "";
-    await readSse(res, ev => {
-      if (ev.type === "chunk") { acc += ev.text; setThread(t => [...t.slice(0, -1), { role: "assistant", content: acc }]); }
-      if (ev.type === "error") setThread(t => [...t.slice(0, -1), { role: "assistant", content: `⛔ ${ev.message}` }]);
-    });
-    setBusy(false);
+    try {
+      const res = await fetch(`/api/runs/${runId}/reply`, {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ message }), signal: ctrl.signal,
+      });
+      if (!res.ok || !res.body) {
+        let msg = `Request failed (${res.status})`;
+        try { const j = await res.json(); if (j?.error) msg = j.error; } catch { /* body not JSON */ }
+        if (openRunRef.current === runId)
+          setThread(t => [...t.slice(0, -1), { role: "assistant", content: `⛔ ${msg}` }]);
+        return acc;
+      }
+      await readSse(res, ev => {
+        if (openRunRef.current !== runId) return; // run switched mid-stream — drop stale events
+        if (ev.type === "chunk") { acc += ev.text; setThread(t => [...t.slice(0, -1), { role: "assistant", content: acc }]); }
+        if (ev.type === "error") setThread(t => [...t.slice(0, -1), { role: "assistant", content: `⛔ ${ev.message}` }]);
+      });
+    } catch (e) {
+      const aborted = e instanceof DOMException && e.name === "AbortError";
+      if (!aborted && openRunRef.current === runId) {
+        const msg = e instanceof Error ? e.message : String(e);
+        setThread(t => [...t.slice(0, -1), { role: "assistant", content: `⛔ ${msg}` }]);
+      }
+    } finally {
+      setBusy(false);
+    }
     return acc;
   }
 
   async function submitQuiz() {
     if (!quiz) return;
-    const answerText = quiz.map(q => `Q${q.id}: ${quizAnswers[q.id] ?? "(blank)"}`).join("\n");
+    const answered = quiz;
+    const answers = quizAnswers;
+    const answerText = answered.map(q => `Q${q.id}: ${answers[q.id] ?? "(blank)"}`).join("\n");
     const feedback = await send(`My answers:\n${answerText}\n\nGrade them.`);
     await fetch("/api/quiz", {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({
         runId: openRunId,
-        attempts: quiz.map(q => ({ question: q.question, user_answer: quizAnswers[q.id] ?? "", correct: null, feedback })),
+        attempts: answered.map(q => ({ question: q.question, user_answer: answers[q.id] ?? "", correct: null, feedback })),
       }),
     });
   }

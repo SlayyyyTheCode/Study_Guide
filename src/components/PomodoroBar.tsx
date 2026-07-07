@@ -13,6 +13,9 @@ export default function PomodoroBar() {
   const [stats, setStats] = useState<{ todayMin: number; weekMin: number } | null>(null);
   const tick = useRef<ReturnType<typeof setInterval> | null>(null);
   const breakTotalSeconds = useRef(BREAK_MIN * 60);
+  // Wall-clock deadline: background tabs throttle setInterval, so we recompute
+  // remaining time from Date.now() instead of counting ticks.
+  const endAt = useRef(0);
 
   useEffect(() => {
     if (!workflowId) return;
@@ -21,8 +24,8 @@ export default function PomodoroBar() {
 
   function notify(msg: string) {
     try {
-      if (Notification.permission === "granted") new Notification("🍅 Study Guide", { body: msg });
-      else if (Notification.permission !== "denied") Notification.requestPermission();
+      if ("Notification" in window && Notification.permission === "granted")
+        new Notification("🍅 Study Guide", { body: msg });
     } catch { /* notifications unavailable */ }
     try {
       const ctx = new AudioContext(); const o = ctx.createOscillator(); o.connect(ctx.destination);
@@ -32,12 +35,39 @@ export default function PomodoroBar() {
 
   function startBlock(i: number) {
     if (!plan) return;
-    setBlockIdx(i); setPhase("focus"); setSecondsLeft(plan[i].minutes * 60); setPaused(false);
+    const secs = plan[i].minutes * 60;
+    endAt.current = Date.now() + secs * 1000;
+    setBlockIdx(i); setPhase("focus"); setSecondsLeft(secs); setPaused(false);
+  }
+
+  function startSession() {
+    // Request notification permission from the user-gesture context.
+    try {
+      if ("Notification" in window && Notification.permission === "default") Notification.requestPermission();
+    } catch { /* notifications unavailable */ }
+    startBlock(0);
+  }
+
+  function togglePause() {
+    if (paused) {
+      endAt.current = Date.now() + secondsLeft * 1000;
+      setPaused(false);
+    } else {
+      setPaused(true); // secondsLeft already holds the remaining time
+    }
+  }
+
+  function skip() {
+    endAt.current = Date.now();
+    setSecondsLeft(0);
   }
 
   useEffect(() => {
     if (phase === "idle" || paused) return;
-    tick.current = setInterval(() => setSecondsLeft(s => s - 1), 1000);
+    tick.current = setInterval(
+      () => setSecondsLeft(Math.max(0, Math.round((endAt.current - Date.now()) / 1000))),
+      1000
+    );
     return () => { if (tick.current) clearInterval(tick.current); };
   }, [phase, paused]);
 
@@ -53,10 +83,11 @@ export default function PomodoroBar() {
       const breakMin = isLong ? LONG_BREAK_MIN : BREAK_MIN;
       notify(`Block ${b.n} done! ${isLong ? "Long break" : "Break"} time.`);
       breakTotalSeconds.current = breakMin * 60;
-      setPhase("break"); setSecondsLeft(breakMin * 60);
+      endAt.current = Date.now() + breakMin * 60 * 1000;
+      setPhase("break"); setSecondsLeft(breakMin * 60); setPaused(false);
     } else if (phase === "break" && plan) {
       if (blockIdx + 1 < plan.length) { notify(`Break over — next: ${plan[blockIdx + 1].topic}`); startBlock(blockIdx + 1); }
-      else { notify("Session complete! 🎉"); setPhase("idle"); setPlan(null); }
+      else { notify("Session complete! 🎉"); setPhase("idle"); setPaused(false); setPlan(null); }
     }
   }, [secondsLeft, phase]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -78,15 +109,15 @@ export default function PomodoroBar() {
         <div className="pomo-track"><div className="pomo-fill" style={{ width: `${pct}%` }} /></div>
       </div>
       {phase === "idle"
-        ? <button type="button" className="node-btn" onClick={() => startBlock(0)}>▶ Start session</button>
+        ? <button type="button" className="node-btn" onClick={startSession}>▶ Start session</button>
         : <>
-            <button type="button" className="node-btn" onClick={() => setPaused(p => !p)} aria-label={paused ? "Resume timer" : "Pause timer"}>
+            <button type="button" className="node-btn" onClick={togglePause} aria-label={paused ? "Resume timer" : "Pause timer"}>
               {paused ? "▶ Resume" : "⏸ Pause"}
             </button>
-            <button type="button" className="node-btn" onClick={() => setSecondsLeft(0)} aria-label="Skip to next phase">⏭ Skip</button>
+            <button type="button" className="node-btn" onClick={skip} aria-label="Skip to next phase">⏭ Skip</button>
           </>}
       {stats && <span className="pomo-stats">today {stats.todayMin}m · week {stats.weekMin}m</span>}
-      <button type="button" className="node-btn" onClick={() => { setPhase("idle"); setPlan(null); }} aria-label="End pomodoro session">✕</button>
+      <button type="button" className="node-btn" onClick={() => { setPhase("idle"); setPaused(false); setPlan(null); }} aria-label="End pomodoro session">✕</button>
     </div>
   );
 }

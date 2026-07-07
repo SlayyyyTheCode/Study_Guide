@@ -26,16 +26,30 @@ export default function ChatPanel() {
     setDraft(""); setBusy(true);
     setMsgs(m => [...m, { role: "user", content: message }, { role: "assistant", content: "" }]);
     const model = provider === "claude" ? "sonnet" : (brains.ollama?.models[0] ?? "");
-    const res = await fetch("/api/chat", {
-      method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ workflowId, message, provider, model }),
-    });
-    let acc = "";
-    await readSse(res, ev => {
-      if (ev.type === "chunk") { acc += ev.text; setMsgs(m => [...m.slice(0, -1), { role: "assistant", content: acc }]); }
-      if (ev.type === "error") setMsgs(m => [...m.slice(0, -1), { role: "assistant", content: `⛔ ${ev.message}` }]);
-    });
-    setBusy(false);
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ workflowId, message, provider, model }),
+      });
+      if (!res.ok || !res.body) {
+        let msg = `Request failed (${res.status})`;
+        try { const j = await res.json(); if (j?.error) msg = j.error; } catch { /* body not JSON */ }
+        setMsgs(m => [...m.slice(0, -1), { role: "assistant", content: `⛔ ${msg}` }]);
+        return;
+      }
+      let acc = "";
+      await readSse(res, ev => {
+        if (ev.type === "chunk") { acc += ev.text; setMsgs(m => [...m.slice(0, -1), { role: "assistant", content: acc }]); }
+        if (ev.type === "error") setMsgs(m => [...m.slice(0, -1), { role: "assistant", content: `⛔ ${ev.message}` }]);
+      });
+    } catch (e) {
+      if (!(e instanceof DOMException && e.name === "AbortError")) {
+        const msg = e instanceof Error ? e.message : String(e);
+        setMsgs(m => [...m.slice(0, -1), { role: "assistant", content: `⛔ ${msg}` }]);
+      }
+    } finally {
+      setBusy(false);
+    }
   }
 
   if (!open) return <button type="button" className="chat-toggle" onClick={() => setOpen(true)} aria-label="Open chat">💬</button>;
@@ -47,7 +61,10 @@ export default function ChatPanel() {
       <div className="chat-head">
         <strong>💬 Chat</strong>
         <select aria-label="Chat brain" value={provider} onChange={e => setProvider(e.target.value)}>
-          <option value="claude">Claude</option><option value="ollama">Ollama</option>
+          <option value="claude">Claude</option>
+          <option value="ollama" disabled={(brains.ollama?.models ?? []).length === 0} title="No Ollama models detected">
+            Ollama
+          </option>
         </select>
         <button type="button" className="node-btn" onClick={() => setOpen(false)} aria-label="Collapse chat">—</button>
       </div>

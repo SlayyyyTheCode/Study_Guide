@@ -8,7 +8,7 @@ interface Props {
 }
 
 export default function TopBar({ onRunAll }: Props) {
-  const { workflowId, setWorkflowId, setBrains } = useApp();
+  const { workflowId, setWorkflowId, setBrains, drawerOpen, setDrawerOpen } = useApp();
   const [workflows, setWorkflows] = useState<WorkflowRow[]>([]);
   const [error, setError] = useState("");
 
@@ -92,6 +92,9 @@ export default function TopBar({ onRunAll }: Props) {
       <button type="button" onClick={newWorkflow} aria-label="Create new workflow">+ New</button>
       <button type="button" onClick={onRunAll} aria-label="Run all output nodes" disabled={!workflowId}>
         ▶▶ Run All
+      </button>
+      <button type="button" onClick={() => setDrawerOpen(!drawerOpen)} aria-label="Toggle library">
+        📚 Library
       </button>
       {error && <span className="topbar-error" role="alert">{error}</span>}
     </div>

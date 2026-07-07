@@ -7,6 +7,7 @@ import Canvas from "@/components/Canvas";
 import ChatPanel from "@/components/ChatPanel";
 import ResultPanel from "@/components/ResultPanel";
 import PomodoroBar from "@/components/PomodoroBar";
+import LibraryDrawer from "@/components/LibraryDrawer";
 
 export default function Home() {
   const runAllRef = useRef<(() => void) | null>(null);
@@ -22,6 +23,7 @@ export default function Home() {
           <ChatPanel />
         </div>
         <ResultPanel />
+        <LibraryDrawer />
       </div>
     </AppProvider>
   );

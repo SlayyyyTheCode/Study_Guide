@@ -20,9 +20,10 @@ import { isValidEdge, type Graph } from "@/lib/graph";
 import InputNode from "@/components/nodes/InputNode";
 import BrainNode from "@/components/nodes/BrainNode";
 import OutputNode from "@/components/nodes/OutputNode";
+import LibraryNode from "@/components/nodes/LibraryNode";
 import FlowEdge from "@/components/FlowEdge";
 
-const nodeTypes = { input: InputNode, brain: BrainNode, output: OutputNode };
+const nodeTypes = { input: InputNode, brain: BrainNode, output: OutputNode, library: LibraryNode };
 const edgeTypes = { flow: FlowEdge };
 
 export interface CanvasHandle {
@@ -123,6 +124,16 @@ function CanvasInner({ runAllRef }: Props) {
 
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
+    const lib = e.dataTransfer.getData("application/sg-library");
+    if (lib) {
+      const p = JSON.parse(lib);
+      const pos = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+      setNodes(ns => [...ns, {
+        id: `library-${Date.now()}`, type: "library", position: pos,
+        data: { libraryItemId: p.itemId, categoryId: p.categoryId, title: p.title, categoryName: p.categoryName },
+      }]);
+      return;
+    }
     const raw = e.dataTransfer.getData("application/sg-node");
     if (!raw) return;
     const { type, data } = JSON.parse(raw) as { type: string; data: Record<string, unknown> };

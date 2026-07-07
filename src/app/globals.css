@@ -122,3 +122,20 @@ button { font: inherit; cursor: pointer; }
 .node { animation: node-in 200ms ease-out; }
 @keyframes node-in { from { transform: scale(.9); opacity: 0; } }
 .anim-paused .flow-edge-running, .anim-paused .node-running { animation-play-state: paused; }
+
+.lib-drawer { position: fixed; right: 0; top: 0; bottom: 0; width: min(380px, 90vw); background: var(--panel); border-left: 1px solid var(--border); z-index: 25; display: flex; flex-direction: column; animation: drawer-in 200ms ease-out; }
+@keyframes drawer-in { from { transform: translateX(40px); opacity: 0; } }
+.lib-head { display: flex; gap: 8px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+.lib-head input { flex: 1; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; }
+.lib-body { flex: 1; overflow-y: auto; padding: 8px; }
+.lib-cat { display: block; width: 100%; text-align: left; background: none; border: none; color: var(--muted); padding: 6px 4px; font-size: 12px; text-transform: none; }
+.lib-item { display: flex; align-items: center; gap: 6px; padding: 5px 8px; margin: 2px 0 2px 12px; border-radius: 6px; font-size: 12px; cursor: grab; }
+.lib-item:hover { background: var(--bg); }
+.lib-item-title { flex: 1; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lib-item-date { color: var(--muted); font-size: 10px; }
+.lib-actions { display: none; gap: 2px; }
+.lib-item:hover .lib-actions { display: flex; }
+.lib-item-cat { color: var(--muted); font-style: italic; }
+.lib-empty { color: var(--muted); font-size: 12px; padding: 16px; text-align: center; }
+.node-library { border: 2px solid var(--blue); border-style: dashed; }
+.lib-chip { display: inline-block; margin-top: 4px; padding: 1px 8px; border: 1px solid var(--border); border-radius: 10px; font-size: 10px; color: var(--muted); }

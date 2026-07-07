@@ -17,6 +17,10 @@ interface AppState {
   setBrains: (b: BrainsStatus) => void;
   runningOutputs: string[];
   setRunning: (nodeId: string, running: boolean) => void;
+  drawerOpen: boolean;
+  setDrawerOpen: (v: boolean) => void;
+  libraryPreviewId: number | null;              // library item open in ResultPanel
+  setLibraryPreviewId: (id: number | null) => void;
 }
 
 const Ctx = createContext<AppState | null>(null);
@@ -31,10 +35,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const setRunning = useCallback((nodeId: string, running: boolean) => {
     setRunningOutputs(prev => running ? (prev.includes(nodeId) ? prev : [...prev, nodeId]) : prev.filter(id => id !== nodeId));
   }, []);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [libraryPreviewId, setLibraryPreviewId] = useState<number | null>(null);
   return (
     <Ctx.Provider value={{
       workflowId, setWorkflowId, openRunId, setOpenRunId, openMethod, setOpenMethod, plan, setPlan, brains, setBrains,
-      runningOutputs, setRunning,
+      runningOutputs, setRunning, drawerOpen, setDrawerOpen, libraryPreviewId, setLibraryPreviewId,
     }}>
       {children}
     </Ctx.Provider>

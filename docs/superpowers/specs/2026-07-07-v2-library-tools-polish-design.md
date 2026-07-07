@@ -27,7 +27,7 @@ Snapshot-copy design (approach A): library items are independent copies. Workflo
 ### Library drawer (UI)
 - 📚 button in TopBar toggles a 380px drawer sliding over the canvas from the right (overlay, does not squeeze chat). 200ms ease-out.
 - Contents: search box (filters title + content substring), collapsible category tree with item counts, item rows (kind icon, title, date).
-- Item actions (hover/kebab): Preview (read-only panel view), Rename, Move to category, Delete (confirm).
+- Item actions (hover/kebab): Preview, Rename, Move to category, Delete (confirm). Preview opens the panel with the item's native renderer: flashcards items open the interactive deck (review mode), mindmap items open the outline/graph view, everything else renders as markdown. This — not the canvas — is how saved decks/maps are re-used interactively; dragging any item to the canvas always makes it input *material*.
 - **Drag item from drawer onto canvas → creates a Library input node** pre-loaded with that item.
 
 ### Library input node (blue family)

@@ -40,7 +40,11 @@ export function getLibraryItem(db: DB, id: number): LibraryItemRow | undefined {
 }
 export function listLibraryItems(db: DB, f: { search?: string; categoryId?: number }): LibraryItemMeta[] {
   const where: string[] = []; const args: unknown[] = [];
-  if (f.search) { where.push("(li.title LIKE ? OR li.content_md LIKE ?)"); args.push(`%${f.search}%`, `%${f.search}%`); }
+  if (f.search) {
+    const esc = f.search.replace(/[\\%_]/g, m => "\\" + m); // literal search: escape LIKE wildcards
+    where.push("(li.title LIKE ? ESCAPE '\\' OR li.content_md LIKE ? ESCAPE '\\')");
+    args.push(`%${esc}%`, `%${esc}%`);
+  }
   if (f.categoryId) { where.push("li.category_id = ?"); args.push(f.categoryId); }
   const sql = `SELECT li.id, li.category_id, li.title, li.kind, li.source_path, li.method, li.created_at,
                       c.name AS category_name
@@ -54,6 +58,16 @@ export function updateLibraryItem(db: DB, id: number, patch: { title?: string; c
 }
 export function deleteLibraryItem(db: DB, id: number): void {
   db.prepare("DELETE FROM library_items WHERE id = ?").run(id);
+}
+/** Snapshot an uploaded text file into the library under a category named after its workflow. */
+export function captureFileToLibrary(
+  db: DB, workflowName: string | undefined, filename: string, contentMd: string, sourcePath: string,
+): LibraryItemRow {
+  const cat = ensureCategory(db, workflowName ?? "Uncategorized");
+  return createLibraryItem(db, {
+    title: filename, kind: "file", content_md: contentMd,
+    categoryId: cat.id, source_path: sourcePath,
+  });
 }
 /** Concatenate all items in a category as one material bundle (same format as multi-file gathering). */
 export function gatherCategoryContent(db: DB, categoryId: number): string {

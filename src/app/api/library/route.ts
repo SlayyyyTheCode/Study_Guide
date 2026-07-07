@@ -5,10 +5,11 @@ import { listLibraryItems, createLibraryItem, ensureCategory } from "@/lib/libra
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const search = url.searchParams.get("search") ?? undefined;
-  const categoryId = url.searchParams.get("categoryId");
-  return NextResponse.json(listLibraryItems(getDb(), {
-    search, categoryId: categoryId ? Number(categoryId) : undefined,
-  }));
+  const categoryIdRaw = url.searchParams.get("categoryId");
+  const categoryId = categoryIdRaw !== null ? Number(categoryIdRaw) : undefined;
+  if (categoryId !== undefined && !Number.isFinite(categoryId))
+    return NextResponse.json({ error: "invalid categoryId" }, { status: 400 });
+  return NextResponse.json(listLibraryItems(getDb(), { search, categoryId }));
 }
 
 export async function POST(req: Request) {

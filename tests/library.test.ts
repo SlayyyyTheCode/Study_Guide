@@ -3,6 +3,7 @@ import { openDb, type DB } from "@/lib/db";
 import {
   ensureCategory, listCategories, renameCategory, deleteCategory,
   createLibraryItem, listLibraryItems, getLibraryItem, updateLibraryItem, deleteLibraryItem,
+  captureFileToLibrary,
 } from "@/lib/library";
 
 let db: DB;
@@ -68,5 +69,32 @@ describe("library", () => {
     const c = ensureCategory(db, "Bio");
     renameCategory(db, c.id, "Biology 2");
     expect(listCategories(db).find(x => x.id === c.id)!.name).toBe("Biology 2");
+  });
+
+  it("search treats LIKE wildcards literally", () => {
+    const bio = ensureCategory(db, "Biology");
+    createLibraryItem(db, { title: "Stats", kind: "file", content_md: "scored 50% on the quiz", categoryId: bio.id });
+    createLibraryItem(db, { title: "Other", kind: "file", content_md: "scored 505 points", categoryId: bio.id });
+    createLibraryItem(db, { title: "Files", kind: "file", content_md: "see file_name conventions", categoryId: bio.id });
+    createLibraryItem(db, { title: "Decoy", kind: "file", content_md: "see fileXname conventions", categoryId: bio.id });
+    expect(listLibraryItems(db, { search: "50%" }).map(i => i.title)).toEqual(["Stats"]);
+    expect(listLibraryItems(db, { search: "file_name" }).map(i => i.title)).toEqual(["Files"]);
+  });
+
+  it("captureFileToLibrary creates category from workflow name and snapshots the file", () => {
+    const item = captureFileToLibrary(db, "My Session", "notes.md", "# Notes\nbody", "/uploads/1/notes.md");
+    const full = getLibraryItem(db, item.id)!;
+    expect(full.kind).toBe("file");
+    expect(full.title).toBe("notes.md");
+    expect(full.content_md).toContain("body");
+    expect(full.source_path).toBe("/uploads/1/notes.md");
+    const cat = listCategories(db).find(c => c.id === full.category_id)!;
+    expect(cat.name).toBe("My Session");
+  });
+
+  it("captureFileToLibrary falls back to Uncategorized when workflow name is undefined", () => {
+    const item = captureFileToLibrary(db, undefined, "orphan.md", "text", "/uploads/9/orphan.md");
+    const cat = listCategories(db).find(c => c.id === item.category_id)!;
+    expect(cat.name).toBe("Uncategorized");
   });
 });

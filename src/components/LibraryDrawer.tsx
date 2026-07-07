@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useApp } from "@/store";
 
 interface Cat { id: number; name: string; icon: string; }
@@ -11,17 +11,42 @@ export default function LibraryDrawer() {
   const [items, setItems] = useState<Item[]>([]);
   const [search, setSearch] = useState("");
   const [collapsed, setCollapsed] = useState<Record<number, boolean>>({});
+  const [error, setError] = useState("");
+  const seqRef = useRef(0);                                        // stale-response guard
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null); // search debounce
 
   const refresh = useCallback(async () => {
+    const seq = ++seqRef.current;
     try {
-      const [c, i] = await Promise.all([
-        fetch("/api/categories").then(r => r.json()),
-        fetch(`/api/library${search ? `?search=${encodeURIComponent(search)}` : ""}`).then(r => r.json()),
+      const [cRes, iRes] = await Promise.all([
+        fetch("/api/categories"),
+        fetch(`/api/library${search ? `?search=${encodeURIComponent(search)}` : ""}`),
       ]);
-      setCats(c); setItems(i);
-    } catch { /* drawer shows what it has */ }
+      if (!cRes.ok || !iRes.ok) throw new Error(`library load failed (${cRes.ok ? iRes.status : cRes.status})`);
+      const [c, i] = await Promise.all([cRes.json(), iRes.json()]);
+      if (seq !== seqRef.current) return; // a newer refresh superseded this one
+      setCats(c); setItems(i); setError("");
+    } catch (e) {
+      if (seq !== seqRef.current) return;
+      setError(e instanceof Error ? e.message : "Could not load library");
+    }
   }, [search]);
-  useEffect(() => { if (drawerOpen) refresh(); }, [drawerOpen, refresh]);
+
+  // Debounced: re-runs per keystroke (refresh identity changes with search) but
+  // only the last timer within 250ms fires. Also covers initial drawer open.
+  useEffect(() => {
+    if (!drawerOpen) return;
+    timerRef.current = setTimeout(refresh, 250);
+    return () => {
+      if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
+    };
+  }, [drawerOpen, refresh]);
+
+  // Enter = refresh now, cancelling the pending debounce so it doesn't double-fetch.
+  const refreshNow = useCallback(() => {
+    if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
+    refresh();
+  }, [refresh]);
 
   if (!drawerOpen) return null;
 
@@ -49,10 +74,18 @@ export default function LibraryDrawer() {
       <div className="lib-head">
         <strong>📚 Library</strong>
         <input aria-label="Search library" placeholder="Search…" value={search}
-          onChange={e => setSearch(e.target.value)} onKeyDown={e => e.key === "Enter" && refresh()} />
+          onChange={e => setSearch(e.target.value)} onKeyDown={e => e.key === "Enter" && refreshNow()} />
         <button type="button" className="node-btn" aria-label="Close library" onClick={() => setDrawerOpen(false)}>✕</button>
       </div>
       <div className="lib-body">
+        {error && (
+          <p className="lib-error" role="alert">
+            {error}{" "}
+            <button type="button" className="node-btn" onClick={refreshNow} aria-label="Retry loading library">
+              Retry
+            </button>
+          </p>
+        )}
         {cats.map(cat => {
           const catItems = items.filter(i => i.category_id === cat.id);
           if (search && catItems.length === 0) return null;
@@ -85,7 +118,7 @@ export default function LibraryDrawer() {
             </div>
           );
         })}
-        {cats.length === 0 && <p className="lib-empty">Nothing saved yet. Upload files or 💾 save results — they land here.</p>}
+        {cats.length === 0 && !error && <p className="lib-empty">Nothing saved yet. Upload files or 💾 save results — they land here.</p>}
       </div>
     </aside>
   );

@@ -111,7 +111,6 @@ button { font: inherit; cursor: pointer; }
 
 .flow-edge { stroke: #3a4150; stroke-width: 2; transition: stroke 200ms ease-out; }
 .flow-edge-running { stroke: var(--blue); stroke-dasharray: 8 6; animation: edge-march .7s linear infinite; }
-.flow-edge-done { stroke: var(--green); }
 @keyframes edge-march { to { stroke-dashoffset: -14; } }
 .flow-edge-dot { fill: #7ab8f0; }
 .node-running { animation: node-glow 1.5s ease-in-out infinite; }
@@ -137,5 +136,6 @@ button { font: inherit; cursor: pointer; }
 .lib-item:hover .lib-actions { display: flex; }
 .lib-item-cat { color: var(--muted); font-style: italic; }
 .lib-empty { color: var(--muted); font-size: 12px; padding: 16px; text-align: center; }
+.lib-error { color: var(--red); font-size: 12px; padding: 8px; display: flex; gap: 8px; align-items: center; }
 .node-library { border: 2px solid var(--blue); border-style: dashed; }
 .lib-chip { display: inline-block; margin-top: 4px; padding: 1px 8px; border: 1px solid var(--border); border-radius: 10px; font-size: 10px; color: var(--muted); }

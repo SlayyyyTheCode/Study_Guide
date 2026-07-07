@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import fs from "fs/promises";
 import path from "path";
-import { getDb } from "@/lib/db";
+import { getDb, getWorkflow } from "@/lib/db";
 import { extractFile, estimateTokens } from "@/lib/extract";
+import { ensureCategory, createLibraryItem } from "@/lib/library";
 
 export async function POST(req: Request) {
   const form = await req.formData();
@@ -33,6 +34,16 @@ export async function POST(req: Request) {
   const info = db.prepare(
     "INSERT INTO files (workflow_id, node_id, filename, path, mime, extracted_text, status) VALUES (?,?,?,?,?,?,?)"
   ).run(workflowId, nodeId, file.name, dest, file.type || "application/octet-stream", text, status);
+
+  // Images/needs_vision files have no extracted text to snapshot into the library; they stay workflow-local.
+  if (status === "ready" && text) {
+    const wf = getWorkflow(db, workflowId);
+    const cat = ensureCategory(db, wf?.name ?? "Uncategorized");
+    createLibraryItem(db, {
+      title: file.name, kind: "file", content_md: text,
+      categoryId: cat.id, source_path: dest,
+    });
+  }
 
   return NextResponse.json({
     id: Number(info.lastInsertRowid), filename: file.name, status, pages, warning,

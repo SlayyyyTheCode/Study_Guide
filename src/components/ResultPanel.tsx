@@ -2,9 +2,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { useApp, readSse } from "@/store";
+import { parseCards, parseMindmap } from "@/lib/parse";
+import { METHODS } from "@/lib/prompts";
+import FlashcardDeck from "@/components/renderers/FlashcardDeck";
+import MindMapView from "@/components/renderers/MindMapView";
 
 interface Msg { role: "user" | "assistant"; content: string; }
 interface QuizQ { id: number; type: "mcq" | "short"; question: string; choices?: string[]; answer: string; }
+interface CategoryRow { id: number; name: string; icon: string; }
+interface LibraryItem { id: number; title: string; kind: string; content_md: string; method: string | null; category_id: number; }
 
 function parseQuiz(md: string): QuizQ[] | null {
   const m = md.match(/```json\s*([\s\S]*?)```/);
@@ -13,7 +19,7 @@ function parseQuiz(md: string): QuizQ[] | null {
 }
 
 export default function ResultPanel() {
-  const { openRunId, setOpenRunId, openMethod } = useApp();
+  const { openRunId, setOpenRunId, openMethod, libraryPreviewId, setLibraryPreviewId } = useApp();
   const [thread, setThread] = useState<Msg[]>([]);
   const [loading, setLoading] = useState(false);
   const [draft, setDraft] = useState("");
@@ -22,6 +28,37 @@ export default function ResultPanel() {
   const abortRef = useRef<AbortController | null>(null);
   const openRunRef = useRef<number | null>(null);
   openRunRef.current = openRunId;
+
+  // Library preview mode: fetch the saved item instead of a run thread.
+  const [previewItem, setPreviewItem] = useState<LibraryItem | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const previewRef = useRef<number | null>(null);
+  previewRef.current = libraryPreviewId;
+
+  useEffect(() => {
+    if (!libraryPreviewId) { setPreviewItem(null); return; }
+    setPreviewItem(null); setPreviewLoading(true);
+    fetch(`/api/library/${libraryPreviewId}`)
+      .then(r => r.json())
+      .then(item => { if (previewRef.current === libraryPreviewId) setPreviewItem(item); })
+      .finally(() => setPreviewLoading(false));
+  }, [libraryPreviewId]);
+
+  useEffect(() => {
+    if (!libraryPreviewId) return;
+    function onKey(e: KeyboardEvent) { if (e.key === "Escape") setLibraryPreviewId(null); }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [libraryPreviewId, setLibraryPreviewId]);
+
+  // Save-to-library dialog
+  const [saveOpen, setSaveOpen] = useState(false);
+  const [saveTitle, setSaveTitle] = useState("");
+  const [categories, setCategories] = useState<CategoryRow[]>([]);
+  const [saveCategoryId, setSaveCategoryId] = useState<string>("");
+  const [newCategory, setNewCategory] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [savedFlash, setSavedFlash] = useState(false);
 
   useEffect(() => {
     if (!openRunId) return;
@@ -55,8 +92,35 @@ export default function ResultPanel() {
   const quizIdx = quizSrc?.idx ?? -1;
   useEffect(() => { setQuizAnswers({}); }, [quizIdx]);
 
-  if (!openRunId) return null;
+  // Same backwards-scan pattern for flashcards / mindmap, so Regenerate swaps
+  // in whichever later assistant message actually parses.
+  const cardsSrc = useMemo(() => {
+    if (openMethod !== "flashcards") return null;
+    for (let i = thread.length - 1; i >= 1; i--) {
+      if (thread[i].role !== "assistant") continue;
+      const c = parseCards(thread[i].content);
+      if (c) return { idx: i, cards: c };
+    }
+    return null;
+  }, [openMethod, thread]);
+
+  const mindmapSrc = useMemo(() => {
+    if (openMethod !== "mindmap") return null;
+    for (let i = thread.length - 1; i >= 1; i--) {
+      if (thread[i].role !== "assistant") continue;
+      const m = parseMindmap(thread[i].content);
+      if (m) return { idx: i, map: m };
+    }
+    return null;
+  }, [openMethod, thread]);
+
+  if (!openRunId && !libraryPreviewId) return null;
   const quiz = quizSrc?.quiz ?? null;
+  const needsParsedRenderer = openMethod === "flashcards" || openMethod === "mindmap";
+  const lastAssistantIdx = (() => {
+    for (let i = thread.length - 1; i >= 1; i--) if (thread[i].role === "assistant") return i;
+    return -1;
+  })();
 
   async function send(message: string) {
     const runId = openRunId;
@@ -109,21 +173,118 @@ export default function ResultPanel() {
     });
   }
 
+  function openSaveDialog() {
+    const label = openMethod ? METHODS[openMethod as keyof typeof METHODS]?.label : undefined;
+    setSaveTitle(`${label ?? "Result"} — ${new Date().toISOString().slice(0, 10)}`);
+    setNewCategory(null);
+    setSavedFlash(false);
+    setSaveOpen(true);
+    fetch("/api/categories").then(r => r.json()).then((cats: CategoryRow[]) => {
+      setCategories(cats);
+      setSaveCategoryId(cats[0] ? String(cats[0].id) : "");
+    }).catch(() => {});
+  }
+
+  async function saveToLibrary() {
+    if (lastAssistantIdx < 0 || !saveTitle.trim()) return;
+    setSaving(true);
+    try {
+      const body: Record<string, unknown> = {
+        title: saveTitle.trim(),
+        kind: "result",
+        content_md: thread[lastAssistantIdx].content,
+        method: openMethod,
+      };
+      if (newCategory !== null && newCategory.trim()) body.newCategoryName = newCategory.trim();
+      else body.categoryId = Number(saveCategoryId);
+      await fetch("/api/library", {
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
+      });
+      setSaveOpen(false);
+      setSavedFlash(true);
+      setTimeout(() => setSavedFlash(false), 2000);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (libraryPreviewId) {
+    const previewCards = previewItem?.method === "flashcards" ? parseCards(previewItem.content_md) : null;
+    const previewMap = previewItem?.method === "mindmap" ? parseMindmap(previewItem.content_md) : null;
+    return (
+      <div className="result-panel">
+        <div className="result-head">
+          <strong>📚 {previewItem?.title ?? "Loading…"}</strong>
+          <button type="button" className="node-btn" onClick={() => setLibraryPreviewId(null)} aria-label="Close library preview">
+            ✕ Close
+          </button>
+        </div>
+        <div className="result-body">
+          {previewLoading && !previewItem && <div className="node-sub">Loading…</div>}
+          {previewItem && (
+            previewCards ? <FlashcardDeck cards={previewCards} libraryItemId={previewItem.id} />
+            : previewMap ? <MindMapView map={previewMap} />
+            : <ReactMarkdown>{previewItem.content_md}</ReactMarkdown>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="result-panel">
       <div className="result-head">
         <strong>Result — run #{openRunId}</strong>
+        {!loading && thread.length > 0 && (
+          <button type="button" className="node-btn" onClick={openSaveDialog} aria-label="Save result to library">
+            💾 Save
+          </button>
+        )}
+        {savedFlash && <span className="node-sub">Saved ✓</span>}
         <button type="button" className="node-btn" onClick={() => setOpenRunId(null)} aria-label="Close result panel">
           ✕ Close
         </button>
       </div>
+      {saveOpen && (
+        <div className="save-dialog">
+          <input aria-label="Save title" value={saveTitle} onChange={e => setSaveTitle(e.target.value)} />
+          {newCategory === null ? (
+            <select aria-label="Category" value={saveCategoryId} onChange={e => {
+              if (e.target.value === "__new__") setNewCategory(""); else setSaveCategoryId(e.target.value);
+            }}>
+              {categories.map(c => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
+              <option value="__new__">+ New category…</option>
+            </select>
+          ) : (
+            <input aria-label="New category name" placeholder="New category name" value={newCategory}
+              onChange={e => setNewCategory(e.target.value)} />
+          )}
+          <div style={{ display: "flex", gap: 8 }}>
+            <button type="button" className="node-btn" disabled={saving || !saveTitle.trim()} onClick={saveToLibrary}>Save</button>
+            <button type="button" className="node-btn" onClick={() => setSaveOpen(false)}>Cancel</button>
+          </div>
+        </div>
+      )}
       <div className="result-body">
         {loading && thread.length === 0 && <div className="node-sub">Loading…</div>}
-        {thread.slice(1).map((m, i) => (
-          <div key={i} className={`msg msg-${m.role}`}>
-            {m.role === "assistant" ? <ReactMarkdown>{m.content}</ReactMarkdown> : <em>{m.content}</em>}
-          </div>
-        ))}
+        {thread.slice(1).map((m, i) => {
+          const idx = i + 1; // account for the slice(1) offset
+          if (m.role === "assistant" && openMethod === "flashcards" && cardsSrc?.idx === idx)
+            return <div key={i} className="msg msg-assistant"><FlashcardDeck cards={cardsSrc.cards} runId={openRunId ?? undefined} /></div>;
+          if (m.role === "assistant" && openMethod === "mindmap" && mindmapSrc?.idx === idx)
+            return <div key={i} className={`msg msg-${m.role}`}><MindMapView map={mindmapSrc.map} /></div>;
+          return (
+            <div key={i} className={`msg msg-${m.role}`}>
+              {m.role === "assistant" ? <ReactMarkdown>{m.content}</ReactMarkdown> : <em>{m.content}</em>}
+            </div>
+          );
+        })}
+        {needsParsedRenderer && !cardsSrc && !mindmapSrc && thread.length > 1 && (
+          <button type="button" className="node-btn" disabled={busy} aria-label="Regenerate valid output"
+            onClick={() => send("Your last output was not valid JSON. Reply with ONLY a corrected JSON block in the required format.")}>
+            🔁 Regenerate
+          </button>
+        )}
         {quiz && (
           <div className="quiz-form">
             {quiz.map(q => (

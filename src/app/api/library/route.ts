@@ -1,0 +1,22 @@
+import { NextResponse } from "next/server";
+import { getDb } from "@/lib/db";
+import { listLibraryItems, createLibraryItem, ensureCategory } from "@/lib/library";
+
+export async function GET(req: Request) {
+  const url = new URL(req.url);
+  const search = url.searchParams.get("search") ?? undefined;
+  const categoryId = url.searchParams.get("categoryId");
+  return NextResponse.json(listLibraryItems(getDb(), {
+    search, categoryId: categoryId ? Number(categoryId) : undefined,
+  }));
+}
+
+export async function POST(req: Request) {
+  const { title, kind, content_md, categoryId, newCategoryName, method, source_path } = await req.json();
+  if (!title?.trim() || !kind || content_md === undefined)
+    return NextResponse.json({ error: "title, kind, content_md required" }, { status: 400 });
+  const db = getDb();
+  const catId = newCategoryName?.trim() ? ensureCategory(db, newCategoryName.trim()).id : Number(categoryId);
+  if (!catId) return NextResponse.json({ error: "categoryId or newCategoryName required" }, { status: 400 });
+  return NextResponse.json(createLibraryItem(db, { title: title.trim(), kind, content_md, categoryId: catId, method, source_path }));
+}

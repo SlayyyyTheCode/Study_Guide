@@ -62,19 +62,47 @@ function CanvasInner({ runAllRef }: Props) {
     return () => { cancelled = true; };
   }, [workflowId, setNodes, setEdges]);
 
-  // Debounced autosave.
+  // Debounced autosave. Each schedule snapshots {id, body} so a later flush
+  // can never write the new workflow's state to the old workflow's id.
+  const pendingSave = useRef<{ id: number; body: string } | null>(null);
+
+  const putCanvas = useCallback((id: number, body: string) => {
+    fetch(`/api/workflows/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body,
+    }).catch(() => { /* transient network error; next change retries */ });
+  }, []);
+
   useEffect(() => {
     if (workflowId == null || loadedFor.current !== workflowId) return;
+    const snapshot = {
+      id: workflowId,
+      body: JSON.stringify({ react_flow_json: JSON.stringify({ nodes, edges }) }),
+    };
+    pendingSave.current = snapshot;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
-      fetch(`/api/workflows/${workflowId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ react_flow_json: JSON.stringify({ nodes, edges }) }),
-      }).catch(() => { /* transient network error; next change retries */ });
+      saveTimer.current = null;
+      pendingSave.current = null;
+      putCanvas(snapshot.id, snapshot.body);
     }, 600);
-    return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
-  }, [nodes, edges, workflowId]);
+  }, [nodes, edges, workflowId, putCanvas]);
+
+  // Flush a still-pending save when the workflow switches (or on unmount) so
+  // edits made inside the debounce window are not silently dropped. Uses the
+  // snapshot only, so it always targets the workflow the edits belong to.
+  useEffect(() => {
+    return () => {
+      if (saveTimer.current) {
+        clearTimeout(saveTimer.current);
+        saveTimer.current = null;
+      }
+      const p = pendingSave.current;
+      pendingSave.current = null;
+      if (p) putCanvas(p.id, p.body); // fire-and-forget flush
+    };
+  }, [workflowId, putCanvas]);
 
   const buildGraph = useCallback((): Graph => ({
     nodes: nodes.map(n => ({ id: n.id, type: n.type ?? "", data: n.data as Record<string, unknown> })),

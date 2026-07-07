@@ -51,7 +51,13 @@ export async function readSse(res: Response, onEvent: (obj: any) => void) {
     while ((idx = buf.indexOf("\n\n")) >= 0) {
       const line = buf.slice(0, idx).trim();
       buf = buf.slice(idx + 2);
-      if (line.startsWith("data: ")) onEvent(JSON.parse(line.slice(6)));
+      if (line.startsWith("data: ")) {
+        try {
+          onEvent(JSON.parse(line.slice(6)));
+        } catch {
+          console.warn("readSse: skipping malformed SSE line", line);
+        }
+      }
     }
   }
 }

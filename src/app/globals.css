@@ -20,6 +20,7 @@ button { font: inherit; cursor: pointer; }
 .topbar button:hover:not(:disabled) { border-color: var(--blue); background: var(--panel); }
 .topbar button:active:not(:disabled) { transform: translateY(1px); }
 .topbar button:disabled { opacity: .5; cursor: not-allowed; }
+.topbar-error { color: var(--red); font-size: 12px; margin-left: auto; }
 
 .palette { width: 190px; background: var(--panel); border-right: 1px solid var(--border); padding: 10px; overflow-y: auto; }
 .palette-head { font-size: 11px; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }

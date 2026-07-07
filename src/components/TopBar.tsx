@@ -10,22 +10,32 @@ interface Props {
 export default function TopBar({ onRunAll }: Props) {
   const { workflowId, setWorkflowId, setBrains } = useApp();
   const [workflows, setWorkflows] = useState<WorkflowRow[]>([]);
+  const [error, setError] = useState("");
 
   const loadWorkflows = useCallback(async () => {
-    const res = await fetch("/api/workflows");
-    const list: WorkflowRow[] = await res.json();
-    if (list.length === 0) {
-      const created = await fetch("/api/workflows", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: "My Study Session" }),
-      }).then(r => r.json());
-      setWorkflows([created]);
-      setWorkflowId(created.id);
-      return;
+    try {
+      const res = await fetch("/api/workflows");
+      if (!res.ok) throw new Error(`workflows load failed (${res.status})`);
+      const list: WorkflowRow[] = await res.json();
+      if (list.length === 0) {
+        const createRes = await fetch("/api/workflows", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: "My Study Session" }),
+        });
+        if (!createRes.ok) throw new Error(`workflow create failed (${createRes.status})`);
+        const created: WorkflowRow = await createRes.json();
+        setWorkflows([created]);
+        setWorkflowId(created.id);
+        setError("");
+        return;
+      }
+      setWorkflows(list);
+      setWorkflowId(list[0].id);
+      setError("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not load workflows");
     }
-    setWorkflows(list);
-    setWorkflowId(list[0].id);
   }, [setWorkflowId]);
 
   // Load once on mount; the workflow list is not expected to change from other tabs during a session.
@@ -51,13 +61,20 @@ export default function TopBar({ onRunAll }: Props) {
   async function newWorkflow() {
     const name = window.prompt("Name for the new workflow:");
     if (!name?.trim()) return;
-    const created = await fetch("/api/workflows", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: name.trim() }),
-    }).then(r => r.json());
-    setWorkflows(prev => [created, ...prev]);
-    setWorkflowId(created.id);
+    try {
+      const res = await fetch("/api/workflows", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim() }),
+      });
+      if (!res.ok) throw new Error(`workflow create failed (${res.status})`);
+      const created: WorkflowRow = await res.json();
+      setWorkflows(prev => [created, ...prev]);
+      setWorkflowId(created.id);
+      setError("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not create workflow");
+    }
   }
 
   return (
@@ -76,6 +93,7 @@ export default function TopBar({ onRunAll }: Props) {
       <button type="button" onClick={onRunAll} aria-label="Run all output nodes" disabled={!workflowId}>
         ▶▶ Run All
       </button>
+      {error && <span className="topbar-error" role="alert">{error}</span>}
     </div>
   );
 }

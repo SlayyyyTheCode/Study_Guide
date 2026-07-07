@@ -3,7 +3,7 @@ export interface GNode { id: string; type: NodeType | string; data: Record<strin
 export interface GEdge { source: string; target: string; }
 export interface Graph { nodes: GNode[]; edges: GEdge[]; }
 
-const LEGAL: Record<string, string> = { input: "brain", brain: "output" };
+const LEGAL: Record<string, string> = { input: "brain", library: "brain", brain: "output" };
 
 export function isValidEdge(g: Graph, sourceId: string, targetId: string): boolean {
   const s = g.nodes.find(n => n.id === sourceId);
@@ -24,7 +24,7 @@ export function resolveOutput(g: Graph, outputId: string): Resolution {
   if (!brain) return { ok: false, error: "No brain connected to this output. Wire a brain node into it." };
   const inputs = g.edges
     .filter(e => e.target === brain.id)
-    .map(e => g.nodes.find(n => n.id === e.source && n.type === "input"))
+    .map(e => g.nodes.find(n => n.id === e.source && (n.type === "input" || n.type === "library")))
     .filter((n): n is GNode => Boolean(n));
   if (inputs.length === 0) return { ok: false, error: "The brain has no input files. Wire at least one input node into it." };
   return { ok: true, brain, inputs };

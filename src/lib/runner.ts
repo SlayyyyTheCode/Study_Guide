@@ -5,6 +5,7 @@ import { resolveOutput } from "./graph";
 import { buildMethodPrompt, type MethodId, type MethodOptions } from "./prompts";
 import { getDriver } from "./brains";
 import type { BrainDriver, ChatMsg } from "./brains/types";
+import { getLibraryItem, gatherCategoryContent } from "./library";
 
 export type RunEvent =
   | { type: "start"; runId: number }
@@ -44,7 +45,28 @@ export async function* runOutputNode(
   const model = String(res.brain.data.model ?? "sonnet");
   const driver = opts?.driver ?? getDriver(provider);
 
-  const { material, images } = await gatherMaterial(db, workflowId, res.inputs.map(n => n.id));
+  const fileInputs = res.inputs.filter(n => n.type === "input");
+  const libInputs = res.inputs.filter(n => n.type === "library");
+
+  const { material: fileMaterial, images } = fileInputs.length
+    ? await gatherMaterial(db, workflowId, fileInputs.map(n => n.id))
+    : { material: "", images: [] as string[] };
+
+  const libParts: string[] = [];
+  for (const n of libInputs) {
+    const itemId = n.data.libraryItemId as number | undefined;
+    const categoryId = n.data.categoryId as number | undefined;
+    if (itemId) {
+      const item = getLibraryItem(db, itemId);
+      if (!item) { yield { type: "error", message: "Library item no longer exists. Remove or re-link this node." }; return; }
+      libParts.push(`--- ${item.title} ---\n${item.content_md}`);
+    } else if (categoryId) {
+      const content = gatherCategoryContent(db, categoryId);
+      if (!content) { yield { type: "error", message: "Library category is empty or no longer exists." }; return; }
+      libParts.push(content);
+    }
+  }
+  const material = [fileMaterial, ...libParts].filter(Boolean).join("\n\n");
   if (!material && images.length === 0) { yield { type: "error", message: "Connected inputs have no readable content yet." }; return; }
 
   const prompt = buildMethodPrompt(method, material || "(material provided as attached images)", opts?.methodOptions ?? {});

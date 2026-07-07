@@ -71,6 +71,7 @@ function CanvasInner({ runAllRef }: Props) {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body,
+      keepalive: true, // flush must survive tab close / page unload
     }).catch(() => { /* transient network error; next change retries */ });
   }, []);
 

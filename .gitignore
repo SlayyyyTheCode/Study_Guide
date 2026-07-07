@@ -6,3 +6,4 @@ uploads/
 *.db
 .env*
 tsconfig.tsbuildinfo
+*.sqlite-*

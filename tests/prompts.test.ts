@@ -3,8 +3,8 @@ import { buildMethodPrompt, METHODS, type MethodId } from "@/lib/prompts";
 
 describe("prompts", () => {
   const material = "Osmosis is diffusion of water.";
-  it("knows all five methods", () => {
-    expect(Object.keys(METHODS).sort()).toEqual(["feynman", "pomodoro", "pq4r", "quiz", "summary"]);
+  it("knows all seven methods", () => {
+    expect(Object.keys(METHODS).sort()).toEqual(["feynman", "flashcards", "mindmap", "pomodoro", "pq4r", "quiz", "summary"]);
   });
   it("embeds material and method structure", () => {
     for (const m of Object.keys(METHODS) as MethodId[]) {
@@ -21,5 +21,14 @@ describe("prompts", () => {
   it("pomodoro respects block length", () => {
     const p = buildMethodPrompt("pomodoro", material, { blockMin: 30 });
     expect(p.user).toContain("30");
+  });
+  it("flashcards respects count and focus", () => {
+    const p = buildMethodPrompt("flashcards", material, { count: 20, focus: "definitions" });
+    expect(p.user).toContain("20");
+    expect(p.user).toContain("definitions");
+  });
+  it("mindmap prompt demands json tree", () => {
+    const p = buildMethodPrompt("mindmap", material, {});
+    expect(p.system).toContain('"root"');
   });
 });

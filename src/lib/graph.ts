@@ -1,4 +1,4 @@
-export type NodeType = "input" | "brain" | "output";
+export type NodeType = "input" | "library" | "brain" | "output";
 export interface GNode { id: string; type: NodeType | string; data: Record<string, unknown>; }
 export interface GEdge { source: string; target: string; }
 export interface Graph { nodes: GNode[]; edges: GEdge[]; }

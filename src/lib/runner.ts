@@ -64,6 +64,9 @@ export async function* runOutputNode(
       const content = gatherCategoryContent(db, categoryId);
       if (!content) { yield { type: "error", message: "Library category is empty or no longer exists." }; return; }
       libParts.push(content);
+    } else {
+      yield { type: "error", message: "Library node is not linked to an item or category. Remove or re-link it." };
+      return;
     }
   }
   const material = [fileMaterial, ...libParts].filter(Boolean).join("\n\n");

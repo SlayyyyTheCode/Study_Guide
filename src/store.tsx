@@ -1,5 +1,5 @@
 "use client";
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
 
 export interface PomodoroBlock { n: number; minutes: number; topic: string; goal: string; }
 export interface BrainsStatus { [id: string]: { ok: boolean; hint?: string; models: string[] }; }
@@ -15,6 +15,8 @@ interface AppState {
   setPlan: (p: PomodoroBlock[] | null) => void;
   brains: BrainsStatus;
   setBrains: (b: BrainsStatus) => void;
+  runningOutputs: string[];
+  setRunning: (nodeId: string, running: boolean) => void;
 }
 
 const Ctx = createContext<AppState | null>(null);
@@ -25,8 +27,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [openMethod, setOpenMethod] = useState<string | null>(null);
   const [plan, setPlan] = useState<PomodoroBlock[] | null>(null);
   const [brains, setBrains] = useState<BrainsStatus>({});
+  const [runningOutputs, setRunningOutputs] = useState<string[]>([]);
+  const setRunning = useCallback((nodeId: string, running: boolean) => {
+    setRunningOutputs(prev => running ? (prev.includes(nodeId) ? prev : [...prev, nodeId]) : prev.filter(id => id !== nodeId));
+  }, []);
   return (
-    <Ctx.Provider value={{ workflowId, setWorkflowId, openRunId, setOpenRunId, openMethod, setOpenMethod, plan, setPlan, brains, setBrains }}>
+    <Ctx.Provider value={{
+      workflowId, setWorkflowId, openRunId, setOpenRunId, openMethod, setOpenMethod, plan, setPlan, brains, setBrains,
+      runningOutputs, setRunning,
+    }}>
       {children}
     </Ctx.Provider>
   );

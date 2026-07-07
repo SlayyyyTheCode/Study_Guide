@@ -108,3 +108,17 @@ button { font: inherit; cursor: pointer; }
 .pomo-track { height: 5px; background: var(--border); border-radius: 3px; margin-top: 3px; }
 .pomo-fill { height: 100%; background: var(--red); border-radius: 3px; transition: width 1s linear; }
 .pomo-stats { font-size: 11px; color: var(--muted); white-space: nowrap; }
+
+.flow-edge { stroke: #3a4150; stroke-width: 2; transition: stroke 200ms ease-out; }
+.flow-edge-running { stroke: var(--blue); stroke-dasharray: 8 6; animation: edge-march .7s linear infinite; }
+.flow-edge-done { stroke: var(--green); }
+@keyframes edge-march { to { stroke-dashoffset: -14; } }
+.flow-edge-dot { fill: #7ab8f0; }
+.node-running { animation: node-glow 1.5s ease-in-out infinite; }
+@keyframes node-glow { 0%,100% { box-shadow: 0 0 4px rgba(74,144,217,.3); } 50% { box-shadow: 0 0 18px rgba(74,144,217,.9); } }
+.node-done { animation: node-flash 600ms ease-out 1; }
+@keyframes node-flash { 0% { box-shadow: 0 0 16px rgba(77,171,109,.9); } 100% { box-shadow: none; } }
+.node-error { box-shadow: 0 0 10px rgba(224,93,68,.6); }
+.node { animation: node-in 200ms ease-out; }
+@keyframes node-in { from { transform: scale(.9); opacity: 0; } }
+.anim-paused .flow-edge-running, .anim-paused .node-running { animation-play-state: paused; }

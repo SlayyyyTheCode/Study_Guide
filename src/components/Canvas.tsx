@@ -1,6 +1,6 @@
 "use client";
 import "@xyflow/react/dist/style.css";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -20,8 +20,10 @@ import { isValidEdge, type Graph } from "@/lib/graph";
 import InputNode from "@/components/nodes/InputNode";
 import BrainNode from "@/components/nodes/BrainNode";
 import OutputNode from "@/components/nodes/OutputNode";
+import FlowEdge from "@/components/FlowEdge";
 
 const nodeTypes = { input: InputNode, brain: BrainNode, output: OutputNode };
+const edgeTypes = { flow: FlowEdge };
 
 export interface CanvasHandle {
   runAll: () => void;
@@ -32,7 +34,7 @@ interface Props {
 }
 
 function CanvasInner({ runAllRef }: Props) {
-  const { workflowId } = useApp();
+  const { workflowId, runningOutputs } = useApp();
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const { screenToFlowPosition } = useReactFlow();
@@ -53,7 +55,7 @@ function CanvasInner({ runAllRef }: Props) {
       try {
         const parsed = JSON.parse(wf.react_flow_json);
         setNodes(parsed.nodes ?? []);
-        setEdges(parsed.edges ?? []);
+        setEdges((parsed.edges ?? []).map((e: Edge) => ({ ...e, type: "flow" })));
       } catch {
         setNodes([]);
         setEdges([]);
@@ -134,6 +136,26 @@ function CanvasInner({ runAllRef }: Props) {
     e.dataTransfer.dropEffect = "move";
   }, []);
 
+  const displayEdges = useMemo(() => {
+    if (runningOutputs.length === 0) return edges;
+    const active = new Set<string>();
+    for (const outId of runningOutputs) {
+      const brainEdge = edges.find(e => e.target === outId);
+      if (!brainEdge) continue;
+      active.add(brainEdge.id);
+      for (const e of edges) if (e.target === brainEdge.source) active.add(e.id);
+    }
+    return edges.map(e => active.has(e.id) ? { ...e, data: { ...e.data, state: "running" } } : e);
+  }, [edges, runningOutputs]);
+
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    const onVis = () => wrap.classList.toggle("anim-paused", document.hidden);
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, []);
+
   useEffect(() => {
     runAllRef.current = () => {
       const wrap = wrapRef.current;
@@ -154,7 +176,7 @@ function CanvasInner({ runAllRef }: Props) {
       )}
       <ReactFlow
         nodes={nodes}
-        edges={edges}
+        edges={displayEdges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
@@ -162,6 +184,8 @@ function CanvasInner({ runAllRef }: Props) {
         onDrop={onDrop}
         onDragOver={onDragOver}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
+        defaultEdgeOptions={{ type: "flow" }}
         deleteKeyCode={["Backspace", "Delete"]}
         fitView
       >

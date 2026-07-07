@@ -56,6 +56,31 @@ CREATE TABLE IF NOT EXISTS pomodoro_blocks (
   planned_min INTEGER NOT NULL,
   completed_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+CREATE TABLE IF NOT EXISTS categories (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL UNIQUE,
+  icon TEXT NOT NULL DEFAULT '📁',
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS library_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  category_id INTEGER NOT NULL REFERENCES categories(id),
+  title TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  content_md TEXT NOT NULL,
+  source_path TEXT,
+  method TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS flashcard_reviews (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  run_id INTEGER,
+  library_item_id INTEGER,
+  front TEXT NOT NULL,
+  back TEXT NOT NULL,
+  missed INTEGER NOT NULL DEFAULT 0,
+  last_reviewed TEXT NOT NULL DEFAULT (datetime('now'))
+);
 `;
 
 export function openDb(file: string): DB {

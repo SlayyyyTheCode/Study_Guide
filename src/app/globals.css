@@ -177,3 +177,19 @@ button { font: inherit; cursor: pointer; }
 .quickadd-row { text-align: left; background: none; border: none; color: var(--text); padding: 8px 10px; border-radius: 8px; font-size: 13px; }
 .quickadd-sel { background: rgba(74, 144, 217, .18); }
 .quickadd-empty { color: var(--muted); padding: 10px; font-size: 13px; }
+
+.minimap-float { position: absolute; z-index: 15; display: flex; flex-direction: column; }
+.minimap-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  background: var(--surface-3); border: 1px solid var(--border); border-bottom: none;
+  border-radius: 8px 8px 0 0; padding: 2px 8px; font-size: 11px;
+}
+.minimap-collapsed .minimap-bar { border-bottom: 1px solid var(--border); border-radius: 8px; }
+.minimap-grip { cursor: grab; color: var(--muted); user-select: none; touch-action: none; }
+.minimap-grip:active { cursor: grabbing; }
+.minimap-toggle { background: none; border: none; color: var(--muted); font-size: 12px; padding: 0 2px; }
+.minimap-toggle:hover { color: var(--text); }
+/* MiniMap renders its own react-flow panel; neutralize its absolute positioning
+   so it sits inside the floating box instead of the flow container. */
+.minimap-float .react-flow__panel { position: static; margin: 0; }
+.minimap-float .react-flow__minimap { border: 1px solid var(--border); border-radius: 0 0 8px 8px; }

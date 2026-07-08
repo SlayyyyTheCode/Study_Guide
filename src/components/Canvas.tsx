@@ -6,7 +6,6 @@ import {
   ReactFlowProvider,
   Background,
   Controls,
-  MiniMap,
   addEdge,
   useNodesState,
   useEdgesState,
@@ -24,6 +23,7 @@ import OutputNode from "@/components/nodes/OutputNode";
 import LibraryNode from "@/components/nodes/LibraryNode";
 import FlowEdge from "@/components/FlowEdge";
 import QuickAdd, { type QuickAddEntry } from "@/components/QuickAdd";
+import FloatingMiniMap from "@/components/FloatingMiniMap";
 
 const nodeTypes = { input: InputNode, brain: BrainNode, output: OutputNode, library: LibraryNode };
 const edgeTypes = { flow: FlowEdge };
@@ -234,13 +234,8 @@ function CanvasInner({ runAllRef }: Props) {
       >
         <Background gap={20} />
         <Controls />
-        <MiniMap
-          position="bottom-left"
-          pannable
-          zoomable
-          nodeColor={n => n.type === "brain" ? "#b07ad9" : n.type === "output" ? "#4dab6d" : "#4a90d9"}
-        />
       </ReactFlow>
+      <FloatingMiniMap boundsRef={wrapRef} />
       {quickAt !== "closed" && (
         <QuickAdd at={quickAt} onPick={onPick} onClose={() => setQuickAt("closed")} />
       )}

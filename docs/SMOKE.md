@@ -25,5 +25,5 @@
 - [ ] Drawer preview of saved deck opens review mode; saved mindmap opens outline
 - [ ] While a node runs: its wires march + pulse dot travels; node glows; done flashes green
 - [ ] Ctrl+K → "fla" → Enter drops Flashcards node; double-click canvas opens popup at cursor
-- [ ] MiniMap bottom-left shows color-coded nodes; snap toggle affects dragging
+- [ ] MiniMap floats top-left, drag grip moves it, — minimizes to a bar (persists across reload); snap toggle affects dragging
 - [ ] Regenerate button appears when flashcards/mindmap JSON is malformed

@@ -14,7 +14,10 @@ const DEFAULT_POS = { x: 12, y: 12 }; // top-left of the canvas
 export default function FloatingMiniMap({ boundsRef }: { boundsRef: React.RefObject<HTMLDivElement | null> }) {
   const [pos, setPos] = useState(DEFAULT_POS);
   const [collapsed, setCollapsed] = useState(false);
-  const dragRef = useRef<{ dx: number; dy: number } | null>(null);
+  // dx/dy are the grab offset in container-relative coordinates; boundsLeft/Top
+  // let onPointerMove convert viewport clientX/Y into that same coordinate
+  // space without re-measuring the container on every move event.
+  const dragRef = useRef<{ dx: number; dy: number; boundsLeft: number; boundsTop: number } | null>(null);
   const boxRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -40,12 +43,22 @@ export default function FloatingMiniMap({ boundsRef }: { boundsRef: React.RefObj
   }
 
   function onPointerDown(e: React.PointerEvent) {
-    dragRef.current = { dx: e.clientX - pos.x, dy: e.clientY - pos.y };
+    const bounds = boundsRef.current?.getBoundingClientRect();
+    if (!bounds) return;
+    // Grab offset must be computed in the same (container-relative) space as
+    // `pos`, not raw viewport coordinates — otherwise the box jumps relative
+    // to the cursor by however far the canvas sits from the viewport origin.
+    const containerX = e.clientX - bounds.left;
+    const containerY = e.clientY - bounds.top;
+    dragRef.current = { dx: containerX - pos.x, dy: containerY - pos.y, boundsLeft: bounds.left, boundsTop: bounds.top };
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   }
   function onPointerMove(e: React.PointerEvent) {
-    if (!dragRef.current) return;
-    setPos(clamp(e.clientX - dragRef.current.dx, e.clientY - dragRef.current.dy));
+    const d = dragRef.current;
+    if (!d) return;
+    const containerX = e.clientX - d.boundsLeft;
+    const containerY = e.clientY - d.boundsTop;
+    setPos(clamp(containerX - d.dx, containerY - d.dy));
   }
   function onPointerUp() {
     if (!dragRef.current) return;

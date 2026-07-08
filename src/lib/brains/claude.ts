@@ -4,6 +4,8 @@ import type { BrainDriver, StreamOpts } from "./types";
 
 const MODELS = ["sonnet", "opus", "haiku"];
 const HINT = "Claude Code CLI not found. Install it and run `claude` once to log in with your subscription.";
+const STATUS_TTL_MS = 20_000;
+let statusCache: { at: number; result: { ok: boolean; hint?: string } } | null = null;
 
 function buildPrompt(opts: StreamOpts): string | AsyncIterable<SDKUserMessage> {
   const last = opts.messages[opts.messages.length - 1];
@@ -37,9 +39,17 @@ export const claudeDriver: BrainDriver = {
   async listModels() { return MODELS; },
 
   status() {
+    // Spawning `claude --version` is a slow child-process launch (hundreds of
+    // ms on Windows). The status endpoint is polled every 30s by the UI, so
+    // cache the result briefly to avoid a spawn on every poll.
+    const now = Date.now();
+    if (statusCache && now - statusCache.at < STATUS_TTL_MS) return Promise.resolve(statusCache.result);
     return new Promise(resolve => {
-      exec("claude --version", { timeout: 5000 },
-        err => resolve(err ? { ok: false, hint: HINT } : { ok: true }));
+      exec("claude --version", { timeout: 5000 }, err => {
+        const result = err ? { ok: false, hint: HINT } : { ok: true };
+        statusCache = { at: Date.now(), result };
+        resolve(result);
+      });
     });
   },
 

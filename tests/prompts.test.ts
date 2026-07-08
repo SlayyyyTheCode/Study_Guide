@@ -3,8 +3,10 @@ import { buildMethodPrompt, METHODS, type MethodId } from "@/lib/prompts";
 
 describe("prompts", () => {
   const material = "Osmosis is diffusion of water.";
-  it("knows all seven methods", () => {
-    expect(Object.keys(METHODS).sort()).toEqual(["feynman", "flashcards", "mindmap", "pomodoro", "pq4r", "quiz", "summary"]);
+  it("knows all nine methods", () => {
+    expect(Object.keys(METHODS).sort()).toEqual([
+      "cornell", "feynman", "flashcards", "mindmap", "pomodoro", "pq4r", "quiz", "summary", "tutorial",
+    ]);
   });
   it("embeds material and method structure", () => {
     for (const m of Object.keys(METHODS) as MethodId[]) {
@@ -30,5 +32,17 @@ describe("prompts", () => {
   it("mindmap prompt demands json tree", () => {
     const p = buildMethodPrompt("mindmap", material, {});
     expect(p.system).toContain('"root"');
+  });
+  it("cornell prompt asks for a cue column", () => {
+    const p = buildMethodPrompt("cornell", material, {});
+    expect(p.system).toMatch(/cue/i);
+  });
+  it("tutorial prompt is Socratic (question-first, not didactic)", () => {
+    const p = buildMethodPrompt("tutorial", material, {});
+    expect(p.system).toMatch(/one pointed .why. or .how. question/i);
+  });
+  it("quiz system instructs interleaving across multiple sources", () => {
+    const p = buildMethodPrompt("quiz", material, {});
+    expect(p.system).toMatch(/interleave/i);
   });
 });

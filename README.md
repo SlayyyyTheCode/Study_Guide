@@ -54,7 +54,16 @@ Library items survive workflow deletion.
 - **🃏 Flashcards** — flip-through deck with Got it / Missed tracking and
   review-misses replay.
 - **🕸️ Mind Map** — collapsible outline + graph view, copy as markdown.
+- **🗒️ Cornell Notes** — cue column + notes + summary, the format taught at
+  Cornell and Harvard study centers.
+- **🎩 Oxbridge Tutorial** — the Oxford/Cambridge tutorial method: one pointed
+  question at a time, the AI pushes back on weak answers instead of lecturing.
 - **📚 Library item** — recall stored content (drag from drawer or Ctrl+K).
+
+Quiz Bank also **interleaves** questions across multiple wired-in sources
+instead of grouping by source — mixed-topic practice, shown to beat blocking
+one topic at a time. All outputs default to short, direct answers; ask for
+more depth in the follow-up box if you want it.
 
 ## Shortcuts
 

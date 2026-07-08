@@ -3,7 +3,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { useApp, readSse } from "@/store";
 import { parseCards, parseMindmap } from "@/lib/parse";
-import { METHODS } from "@/lib/prompts";
+import { METHODS, type MethodId } from "@/lib/prompts";
+
+const FOLLOW_UP_PLACEHOLDERS: Partial<Record<MethodId, string>> = {
+  feynman: "Explain it back in your own words…",
+  pq4r: "Reply to continue to the next step…",
+  tutorial: "Answer or push back on the tutor's question…",
+};
 import FlashcardDeck from "@/components/renderers/FlashcardDeck";
 import MindMapView from "@/components/renderers/MindMapView";
 import SaveDialog from "@/components/SaveDialog";
@@ -216,7 +222,7 @@ export default function ResultPanel() {
       </div>
       <div className="result-input">
         <input value={draft} aria-label="Follow-up message"
-          placeholder={openMethod === "feynman" ? "Explain it back in your own words…" : openMethod === "pq4r" ? "Reply to continue to the next step…" : "Follow up…"}
+          placeholder={FOLLOW_UP_PLACEHOLDERS[openMethod as MethodId] ?? "Follow up…"}
           onChange={e => setDraft(e.target.value)}
           onKeyDown={e => { if (e.key === "Enter" && draft.trim() && !busy) { send(draft.trim()); setDraft(""); } }} />
         <button type="button" className="node-btn" disabled={busy || !draft.trim()} onClick={() => { send(draft.trim()); setDraft(""); }}>

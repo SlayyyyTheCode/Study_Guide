@@ -27,3 +27,9 @@
 - [ ] Ctrl+K → "fla" → Enter drops Flashcards node; double-click canvas opens popup at cursor
 - [ ] MiniMap floats top-left, drag grip moves it, — minimizes to a bar (persists across reload); snap toggle affects dragging
 - [ ] Regenerate button appears when flashcards/mindmap JSON is malformed
+
+## v2.1 additions
+- [ ] Cornell Notes run → Cues / Notes / Summary sections render, scannable
+- [ ] Oxbridge Tutorial run → asks one question at a time (never a list), reply box shows tutorial placeholder, pushes back on a weak answer instead of just saying "correct"
+- [ ] Quiz wired to two file inputs → questions mix across both sources instead of grouping by source
+- [ ] Existing outputs (Feynman/PQ4R/Quiz/Summary/Flashcards/Mind Map/Chat) read noticeably shorter and more direct than before

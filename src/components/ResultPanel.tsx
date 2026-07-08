@@ -2,6 +2,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { useApp, readSse } from "@/store";
+import { parseCards, parseMindmap } from "@/lib/parse";
+import { METHODS } from "@/lib/prompts";
+import FlashcardDeck from "@/components/renderers/FlashcardDeck";
+import MindMapView from "@/components/renderers/MindMapView";
+import SaveDialog from "@/components/SaveDialog";
 
 interface Msg { role: "user" | "assistant"; content: string; }
 interface QuizQ { id: number; type: "mcq" | "short"; question: string; choices?: string[]; answer: string; }
@@ -19,6 +24,8 @@ export default function ResultPanel() {
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [quizAnswers, setQuizAnswers] = useState<Record<number, string>>({});
+  const [saveOpen, setSaveOpen] = useState(false);
+  const [savedFlash, setSavedFlash] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const openRunRef = useRef<number | null>(null);
   openRunRef.current = openRunId;
@@ -26,6 +33,7 @@ export default function ResultPanel() {
   useEffect(() => {
     if (!openRunId) return;
     setThread([]); setQuizAnswers({}); setLoading(true); setBusy(false);
+    setSaveOpen(false); setSavedFlash(false); // don't leak dialog state across runs
     fetch(`/api/runs/${openRunId}`)
       .then(r => r.json())
       .then(run => { if (openRunRef.current === openRunId) setThread(JSON.parse(run.thread_json)); })
@@ -55,8 +63,35 @@ export default function ResultPanel() {
   const quizIdx = quizSrc?.idx ?? -1;
   useEffect(() => { setQuizAnswers({}); }, [quizIdx]);
 
+  // Same backwards-scan pattern for flashcards / mindmap, so Regenerate swaps
+  // in whichever later assistant message actually parses.
+  const cardsSrc = useMemo(() => {
+    if (openMethod !== "flashcards") return null;
+    for (let i = thread.length - 1; i >= 1; i--) {
+      if (thread[i].role !== "assistant") continue;
+      const c = parseCards(thread[i].content);
+      if (c) return { idx: i, cards: c };
+    }
+    return null;
+  }, [openMethod, thread]);
+
+  const mindmapSrc = useMemo(() => {
+    if (openMethod !== "mindmap") return null;
+    for (let i = thread.length - 1; i >= 1; i--) {
+      if (thread[i].role !== "assistant") continue;
+      const m = parseMindmap(thread[i].content);
+      if (m) return { idx: i, map: m };
+    }
+    return null;
+  }, [openMethod, thread]);
+
   if (!openRunId) return null;
   const quiz = quizSrc?.quiz ?? null;
+  const needsParsedRenderer = openMethod === "flashcards" || openMethod === "mindmap";
+  const lastAssistantIdx = (() => {
+    for (let i = thread.length - 1; i >= 1; i--) if (thread[i].role === "assistant") return i;
+    return -1;
+  })();
 
   async function send(message: string) {
     const runId = openRunId;
@@ -109,21 +144,52 @@ export default function ResultPanel() {
     });
   }
 
+  const methodLabel = openMethod ? METHODS[openMethod as keyof typeof METHODS]?.label : undefined;
+
   return (
     <div className="result-panel">
       <div className="result-head">
         <strong>Result — run #{openRunId}</strong>
+        {!loading && lastAssistantIdx >= 0 && (
+          <button type="button" className="node-btn" onClick={() => { setSavedFlash(false); setSaveOpen(true); }}
+            aria-label="Save result to library">
+            💾 Save
+          </button>
+        )}
+        {savedFlash && <span className="node-sub">Saved ✓</span>}
         <button type="button" className="node-btn" onClick={() => setOpenRunId(null)} aria-label="Close result panel">
           ✕ Close
         </button>
       </div>
+      {saveOpen && lastAssistantIdx >= 0 && (
+        <SaveDialog
+          defaultTitle={`${methodLabel ?? "Result"} — ${new Date().toISOString().slice(0, 10)}`}
+          contentMd={thread[lastAssistantIdx].content}
+          method={openMethod}
+          onClose={() => setSaveOpen(false)}
+          onSaved={() => { setSavedFlash(true); setTimeout(() => setSavedFlash(false), 2000); }}
+        />
+      )}
       <div className="result-body">
         {loading && thread.length === 0 && <div className="node-sub">Loading…</div>}
-        {thread.slice(1).map((m, i) => (
-          <div key={i} className={`msg msg-${m.role}`}>
-            {m.role === "assistant" ? <ReactMarkdown>{m.content}</ReactMarkdown> : <em>{m.content}</em>}
-          </div>
-        ))}
+        {thread.slice(1).map((m, i) => {
+          const idx = i + 1; // account for the slice(1) offset
+          if (m.role === "assistant" && cardsSrc?.idx === idx)
+            return <div key={i} className="msg msg-assistant"><FlashcardDeck key={cardsSrc.idx} cards={cardsSrc.cards} runId={openRunId ?? undefined} /></div>;
+          if (m.role === "assistant" && mindmapSrc?.idx === idx)
+            return <div key={i} className="msg msg-assistant"><MindMapView key={mindmapSrc.idx} map={mindmapSrc.map} /></div>;
+          return (
+            <div key={i} className={`msg msg-${m.role}`}>
+              {m.role === "assistant" ? <ReactMarkdown>{m.content}</ReactMarkdown> : <em>{m.content}</em>}
+            </div>
+          );
+        })}
+        {needsParsedRenderer && !cardsSrc && !mindmapSrc && thread.length > 1 && (
+          <button type="button" className="node-btn" disabled={busy} aria-label="Regenerate valid output"
+            onClick={() => send("Your last output was not valid JSON. Reply with ONLY a corrected JSON block in the required format.")}>
+            🔁 Regenerate
+          </button>
+        )}
         {quiz && (
           <div className="quiz-form">
             {quiz.map(q => (

@@ -1,7 +1,7 @@
-export type MethodId = "feynman" | "pq4r" | "quiz" | "summary" | "pomodoro";
+export type MethodId = "feynman" | "pq4r" | "quiz" | "summary" | "pomodoro" | "flashcards" | "mindmap";
 
 export interface MethodPrompt { system: string; user: string; }
-export interface MethodOptions { count?: number; difficulty?: string; blockMin?: number; }
+export interface MethodOptions { count?: number; difficulty?: string; blockMin?: number; focus?: string; }
 
 export const METHODS: Record<MethodId, { label: string; icon: string }> = {
   feynman: { label: "Feynman Explainer", icon: "🎓" },
@@ -9,6 +9,8 @@ export const METHODS: Record<MethodId, { label: string; icon: string }> = {
   quiz: { label: "Quiz Bank", icon: "📝" },
   summary: { label: "Summary Sheet", icon: "📋" },
   pomodoro: { label: "Pomodoro Planner", icon: "⏱️" },
+  flashcards: { label: "Flashcards", icon: "🃏" },
+  mindmap: { label: "Mind Map", icon: "🕸️" },
 };
 
 const FEYNMAN_SYSTEM = `You are a Feynman-technique tutor. Rules:
@@ -44,6 +46,22 @@ Output ONLY a JSON code block:
 \`\`\`
 Chunk the material into focused blocks. Goals must be verifiable ("can label all organelles"), not vague ("understand cells").`;
 
+const FLASHCARDS_SYSTEM = `You create study flashcards.
+When asked to generate: output ONLY a JSON code block:
+\`\`\`json
+{"cards":[{"front":"question or term","back":"concise answer or definition"}]}
+\`\`\`
+Fronts must be answerable without seeing the back. Backs stay under 40 words.
+If asked to regenerate or fix output, reply with ONLY a corrected JSON block in the same format.`;
+
+const MINDMAP_SYSTEM = `You create concept mind-maps.
+Output ONLY a JSON code block:
+\`\`\`json
+{"root":"main topic","children":[{"label":"branch","children":[{"label":"leaf"}]}]}
+\`\`\`
+Max depth 4, max 6 children per node. Labels under 6 words.
+If asked to regenerate or fix output, reply with ONLY a corrected JSON block in the same format.`;
+
 export function buildMethodPrompt(method: MethodId, material: string, opts: MethodOptions): MethodPrompt {
   const mat = `STUDY MATERIAL:\n"""\n${material}\n"""`;
   switch (method) {
@@ -62,6 +80,13 @@ export function buildMethodPrompt(method: MethodId, material: string, opts: Meth
       const blockMin = opts.blockMin ?? 25;
       return { system: POMODORO_SYSTEM, user: `${mat}\n\nPlan a session with ${blockMin}-minute focus blocks.` };
     }
+    case "flashcards": {
+      const count = opts.count ?? 15;
+      const focus = opts.focus ? ` Focus on: ${opts.focus}.` : "";
+      return { system: FLASHCARDS_SYSTEM, user: `${mat}\n\nGenerate ${count} flashcards.${focus}` };
+    }
+    case "mindmap":
+      return { system: MINDMAP_SYSTEM, user: `${mat}\n\nBuild the mind map.` };
   }
 }
 

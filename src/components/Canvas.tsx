@@ -1,11 +1,12 @@
 "use client";
 import "@xyflow/react/dist/style.css";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ReactFlow,
   ReactFlowProvider,
   Background,
   Controls,
+  MiniMap,
   addEdge,
   useNodesState,
   useEdgesState,
@@ -20,8 +21,12 @@ import { isValidEdge, type Graph } from "@/lib/graph";
 import InputNode from "@/components/nodes/InputNode";
 import BrainNode from "@/components/nodes/BrainNode";
 import OutputNode from "@/components/nodes/OutputNode";
+import LibraryNode from "@/components/nodes/LibraryNode";
+import FlowEdge from "@/components/FlowEdge";
+import QuickAdd, { type QuickAddEntry } from "@/components/QuickAdd";
 
-const nodeTypes = { input: InputNode, brain: BrainNode, output: OutputNode };
+const nodeTypes = { input: InputNode, brain: BrainNode, output: OutputNode, library: LibraryNode };
+const edgeTypes = { flow: FlowEdge };
 
 export interface CanvasHandle {
   runAll: () => void;
@@ -32,13 +37,14 @@ interface Props {
 }
 
 function CanvasInner({ runAllRef }: Props) {
-  const { workflowId } = useApp();
+  const { workflowId, runningOutputs, snap } = useApp();
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const { screenToFlowPosition } = useReactFlow();
   const loadedFor = useRef<number | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const [quickAt, setQuickAt] = useState<{ x: number; y: number } | null | "closed">("closed");
 
   // Load canvas whenever the active workflow changes.
   useEffect(() => {
@@ -53,7 +59,7 @@ function CanvasInner({ runAllRef }: Props) {
       try {
         const parsed = JSON.parse(wf.react_flow_json);
         setNodes(parsed.nodes ?? []);
-        setEdges(parsed.edges ?? []);
+        setEdges((parsed.edges ?? []).map((e: Edge) => ({ ...e, type: "flow" })));
       } catch {
         setNodes([]);
         setEdges([]);
@@ -121,17 +127,74 @@ function CanvasInner({ runAllRef }: Props) {
 
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
+    const lib = e.dataTransfer.getData("application/sg-library");
+    if (lib) {
+      const p = JSON.parse(lib);
+      const pos = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+      setNodes(ns => [...ns, {
+        id: `library-${crypto.randomUUID()}`, type: "library", position: pos,
+        data: { libraryItemId: p.itemId, categoryId: p.categoryId, title: p.title, categoryName: p.categoryName },
+      }]);
+      return;
+    }
     const raw = e.dataTransfer.getData("application/sg-node");
     if (!raw) return;
     const { type, data } = JSON.parse(raw) as { type: string; data: Record<string, unknown> };
     const position = screenToFlowPosition({ x: e.clientX, y: e.clientY });
-    const id = `${type}-${Date.now()}`;
+    const id = `${type}-${crypto.randomUUID()}`;
     setNodes(nds => [...nds, { id, type, position, data }]);
   }, [screenToFlowPosition, setNodes]);
 
   const onDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
+  }, []);
+
+  // Ctrl/Cmd+K opens the quick-add command bar centered on screen.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setQuickAt(null);
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  // Double-clicking empty canvas (the react-flow pane) opens quick-add at the cursor.
+  const onDoubleClick = useCallback((e: React.MouseEvent) => {
+    if (!(e.target as HTMLElement).classList.contains("react-flow__pane")) return;
+    setQuickAt({ x: e.clientX, y: e.clientY });
+  }, []);
+
+  const onPick = useCallback((entry: QuickAddEntry, at: { x: number; y: number } | null) => {
+    const position = at
+      ? screenToFlowPosition(at)
+      : screenToFlowPosition({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
+    const id = `${entry.type}-${crypto.randomUUID()}`;
+    setNodes(ns => [...ns, { id, type: entry.type, position, data: { ...entry.data } }]);
+    setQuickAt("closed");
+  }, [screenToFlowPosition, setNodes]);
+
+  const displayEdges = useMemo(() => {
+    if (runningOutputs.length === 0) return edges;
+    const active = new Set<string>();
+    for (const outId of runningOutputs) {
+      const brainEdge = edges.find(e => e.target === outId);
+      if (!brainEdge) continue;
+      active.add(brainEdge.id);
+      for (const e of edges) if (e.target === brainEdge.source) active.add(e.id);
+    }
+    return edges.map(e => active.has(e.id) ? { ...e, data: { ...e.data, state: "running" } } : e);
+  }, [edges, runningOutputs]);
+
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    const onVis = () => wrap.classList.toggle("anim-paused", document.hidden);
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
   }, []);
 
   useEffect(() => {
@@ -146,7 +209,7 @@ function CanvasInner({ runAllRef }: Props) {
   }, [runAllRef]);
 
   return (
-    <div className="canvas-wrap" ref={wrapRef}>
+    <div className="canvas-wrap" ref={wrapRef} onDoubleClick={onDoubleClick}>
       {nodes.length === 0 && (
         <div className="canvas-empty-hint" aria-hidden="true">
           Drag blocks from the left to build your study flow — Files → Brain → Study methods
@@ -154,7 +217,7 @@ function CanvasInner({ runAllRef }: Props) {
       )}
       <ReactFlow
         nodes={nodes}
-        edges={edges}
+        edges={displayEdges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
@@ -162,12 +225,25 @@ function CanvasInner({ runAllRef }: Props) {
         onDrop={onDrop}
         onDragOver={onDragOver}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
+        defaultEdgeOptions={{ type: "flow" }}
         deleteKeyCode={["Backspace", "Delete"]}
+        snapToGrid={snap}
+        snapGrid={[8, 8]}
         fitView
       >
         <Background gap={20} />
         <Controls />
+        <MiniMap
+          position="bottom-left"
+          pannable
+          zoomable
+          nodeColor={n => n.type === "brain" ? "#b07ad9" : n.type === "output" ? "#4dab6d" : "#4a90d9"}
+        />
       </ReactFlow>
+      {quickAt !== "closed" && (
+        <QuickAdd at={quickAt} onPick={onPick} onClose={() => setQuickAt("closed")} />
+      )}
     </div>
   );
 }

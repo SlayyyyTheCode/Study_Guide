@@ -43,4 +43,19 @@ describe("graph", () => {
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error).toMatch(/input/i);
   });
+  it("library nodes connect only to brains and count as inputs", () => {
+    const g3: Graph = {
+      nodes: [
+        { id: "L1", type: "library", data: { libraryItemId: 5 } },
+        { id: "b1", type: "brain", data: { provider: "claude", model: "sonnet" } },
+        { id: "o1", type: "output", data: { method: "summary" } },
+      ],
+      edges: [{ source: "L1", target: "b1" }, { source: "b1", target: "o1" }],
+    };
+    expect(isValidEdge(g3, "L1", "b1")).toBe(true);
+    expect(isValidEdge(g3, "L1", "o1")).toBe(false);
+    const r = resolveOutput(g3, "o1");
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.inputs.map(n => n.id)).toEqual(["L1"]);
+  });
 });

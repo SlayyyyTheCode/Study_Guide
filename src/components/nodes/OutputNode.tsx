@@ -7,12 +7,13 @@ import { METHODS, type MethodId } from "@/lib/prompts";
 interface OutputData {
   method?: MethodId;
   runId?: number;
+  state?: string;
   [key: string]: unknown;
 }
 
 export default function OutputNode({ id, data }: NodeProps) {
   const nodeData = data as OutputData;
-  const { workflowId, setOpenRunId, setOpenMethod, setPlan } = useApp();
+  const { workflowId, setOpenRunId, setOpenMethod, setPlan, setRunning: setRunningGlobal } = useApp();
   const { updateNodeData } = useReactFlow();
   const [running, setRunning] = useState(false);
   const [preview, setPreview] = useState("");
@@ -25,6 +26,8 @@ export default function OutputNode({ id, data }: NodeProps) {
   async function run() {
     if (!workflowId || running) return;
     setRunning(true);
+    setRunningGlobal(id, true);
+    updateNodeData(id, { state: "running" });
     setError("");
     setPreview("");
     accRef.current = "";
@@ -37,6 +40,7 @@ export default function OutputNode({ id, data }: NodeProps) {
       if (!res.ok || !res.body) {
         const j = await res.json().catch(() => ({}));
         setError(j.error ?? `Run failed (${res.status})`);
+        updateNodeData(id, { state: "error" });
         setRunning(false);
         return;
       }
@@ -48,6 +52,7 @@ export default function OutputNode({ id, data }: NodeProps) {
           setPreview(accRef.current.slice(-160));
         } else if (ev.type === "error") {
           setError(ev.message);
+          updateNodeData(id, { state: "error" });
         } else if (ev.type === "done") {
           if (method === "pomodoro") {
             const m = accRef.current.match(/```json\s*([\s\S]*?)```/);
@@ -58,12 +63,15 @@ export default function OutputNode({ id, data }: NodeProps) {
               } catch { /* ignore malformed plan */ }
             }
           }
+          updateNodeData(id, { state: "done" });
         }
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
+      updateNodeData(id, { state: "error" });
     } finally {
       setRunning(false);
+      setRunningGlobal(id, false);
     }
   }
 
@@ -74,7 +82,7 @@ export default function OutputNode({ id, data }: NodeProps) {
   }
 
   return (
-    <div className="node node-output">
+    <div className={`node node-output ${nodeData.state ? `node-${nodeData.state}` : ""}`}>
       <Handle type="target" position={Position.Left} />
       <div className="node-title">{info.icon} {info.label}</div>
       <div className="node-row">

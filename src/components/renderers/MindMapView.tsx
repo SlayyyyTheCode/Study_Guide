@@ -33,14 +33,21 @@ function Outline({ n, depth }: { n: MindNode; depth: number }) {
 
 export default function MindMapView({ map }: { map: MindMap }) {
   const [view, setView] = useState<"outline" | "graph">("outline");
+  const [copyMsg, setCopyMsg] = useState<string | null>(null);
   const { nodes, edges } = useMemo(() => layout(map), [map]);
 
   function toMarkdown(n: MindNode, depth: number): string {
     return `${"  ".repeat(depth)}- ${n.label}\n` + (n.children ?? []).map(k => toMarkdown(k, depth + 1)).join("");
   }
-  function exportMd() {
+  async function exportMd() {
     const md = `# ${map.root}\n\n` + map.children.map(c => toMarkdown(c, 0)).join("");
-    navigator.clipboard.writeText(md);
+    try {
+      await navigator.clipboard.writeText(md);
+      setCopyMsg("Copied ✓");
+    } catch {
+      setCopyMsg("Copy failed");
+    }
+    setTimeout(() => setCopyMsg(null), 1500);
   }
 
   return (
@@ -50,6 +57,7 @@ export default function MindMapView({ map }: { map: MindMap }) {
           {view === "outline" ? "🕸️ Graph view" : "☰ Outline view"}
         </button>
         <button type="button" className="node-btn" onClick={exportMd}>⧉ Copy as markdown</button>
+        {copyMsg && <span className="node-sub" role="status">{copyMsg}</span>}
       </div>
       {view === "outline"
         ? <Outline n={{ label: map.root, children: map.children }} depth={0} />

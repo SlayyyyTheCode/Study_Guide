@@ -27,7 +27,7 @@ const Ctx = createContext<AppState | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [workflowId, setWorkflowId] = useState<number | null>(null);
-  const [openRunId, setOpenRunId] = useState<number | null>(null);
+  const [openRunId, setOpenRunIdRaw] = useState<number | null>(null);
   const [openMethod, setOpenMethod] = useState<string | null>(null);
   const [plan, setPlan] = useState<PomodoroBlock[] | null>(null);
   const [brains, setBrains] = useState<BrainsStatus>({});
@@ -36,7 +36,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setRunningOutputs(prev => running ? (prev.includes(nodeId) ? prev : [...prev, nodeId]) : prev.filter(id => id !== nodeId));
   }, []);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [libraryPreviewId, setLibraryPreviewId] = useState<number | null>(null);
+  const [libraryPreviewId, setLibraryPreviewIdRaw] = useState<number | null>(null);
+  // Run result and library preview are mutually exclusive panel modes:
+  // opening one closes the other (also guarantees a single Escape listener).
+  const setOpenRunId = useCallback((id: number | null) => {
+    setOpenRunIdRaw(id);
+    if (id !== null) setLibraryPreviewIdRaw(null);
+  }, []);
+  const setLibraryPreviewId = useCallback((id: number | null) => {
+    setLibraryPreviewIdRaw(id);
+    if (id !== null) setOpenRunIdRaw(null);
+  }, []);
   return (
     <Ctx.Provider value={{
       workflowId, setWorkflowId, openRunId, setOpenRunId, openMethod, setOpenMethod, plan, setPlan, brains, setBrains,

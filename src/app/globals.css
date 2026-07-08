@@ -157,3 +157,4 @@ button { font: inherit; cursor: pointer; }
 .mm-graph { height: 400px; border: 1px solid var(--border); border-radius: 8px; }
 .save-dialog { position: absolute; top: 48px; right: 14px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 8px; z-index: 5; box-shadow: 0 8px 24px rgba(0,0,0,.5); }
 .save-dialog input, .save-dialog select { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; }
+.save-error { color: var(--red); font-size: 12px; max-width: 240px; }

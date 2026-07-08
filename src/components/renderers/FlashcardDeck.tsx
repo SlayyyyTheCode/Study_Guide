@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Card } from "@/lib/parse";
 
 interface Props { cards: Card[]; runId?: number; libraryItemId?: number; }
@@ -9,9 +9,16 @@ export default function FlashcardDeck({ cards, runId, libraryItemId }: Props) {
   const [pos, setPos] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const [results, setResults] = useState<Record<number, boolean>>({}); // idx → missed
+  // Guards the completion POST: fires at most once per finished round, even
+  // when React StrictMode double-invokes effects in dev.
+  const postedRef = useRef(false);
 
-  useEffect(() => { // Space flips
-    const h = (e: KeyboardEvent) => { if (e.key === " " && pos < order.length) { e.preventDefault(); setFlipped(f => !f); } };
+  useEffect(() => { // Space flips — unless the user is typing in a form field
+    const h = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
+      if (e.key === " " && pos < order.length) { e.preventDefault(); setFlipped(f => !f); }
+    };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
   }, [pos, order.length]);
@@ -26,8 +33,14 @@ export default function FlashcardDeck({ cards, runId, libraryItemId }: Props) {
     setPos(p => p + 1);
   }
 
+  function restart(nextOrder: number[]) {
+    postedRef.current = false; // new round → allow its completion POST
+    setOrder(nextOrder); setPos(0); setResults({}); setFlipped(false);
+  }
+
   useEffect(() => {
-    if (!done || order.length === 0) return;
+    if (!done || order.length === 0 || postedRef.current) return;
+    postedRef.current = true;
     fetch("/api/flashcards", {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -44,11 +57,11 @@ export default function FlashcardDeck({ cards, runId, libraryItemId }: Props) {
         <div className="deck-end">
           <h3>Deck complete — {got}/{order.length}</h3>
           {missedIdx.length > 0 && (
-            <button type="button" className="node-btn" onClick={() => { setOrder(missedIdx); setPos(0); setResults({}); setFlipped(false); }}>
+            <button type="button" className="node-btn" onClick={() => restart(missedIdx)}>
               🔁 Review {missedIdx.length} missed
             </button>
           )}
-          <button type="button" className="node-btn" onClick={() => { setOrder(cards.map((_, i) => i)); setPos(0); setResults({}); setFlipped(false); }}>
+          <button type="button" className="node-btn" onClick={() => restart(cards.map((_, i) => i))}>
             Restart
           </button>
         </div>

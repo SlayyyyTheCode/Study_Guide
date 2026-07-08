@@ -132,7 +132,7 @@ function CanvasInner({ runAllRef }: Props) {
       const p = JSON.parse(lib);
       const pos = screenToFlowPosition({ x: e.clientX, y: e.clientY });
       setNodes(ns => [...ns, {
-        id: `library-${Date.now()}`, type: "library", position: pos,
+        id: `library-${crypto.randomUUID()}`, type: "library", position: pos,
         data: { libraryItemId: p.itemId, categoryId: p.categoryId, title: p.title, categoryName: p.categoryName },
       }]);
       return;
@@ -141,7 +141,7 @@ function CanvasInner({ runAllRef }: Props) {
     if (!raw) return;
     const { type, data } = JSON.parse(raw) as { type: string; data: Record<string, unknown> };
     const position = screenToFlowPosition({ x: e.clientX, y: e.clientY });
-    const id = `${type}-${Date.now()}`;
+    const id = `${type}-${crypto.randomUUID()}`;
     setNodes(nds => [...nds, { id, type, position, data }]);
   }, [screenToFlowPosition, setNodes]);
 
@@ -172,7 +172,7 @@ function CanvasInner({ runAllRef }: Props) {
     const position = at
       ? screenToFlowPosition(at)
       : screenToFlowPosition({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
-    const id = `${entry.type}-${Date.now()}`;
+    const id = `${entry.type}-${crypto.randomUUID()}`;
     setNodes(ns => [...ns, { id, type: entry.type, position, data: { ...entry.data } }]);
     setQuickAt("closed");
   }, [screenToFlowPosition, setNodes]);

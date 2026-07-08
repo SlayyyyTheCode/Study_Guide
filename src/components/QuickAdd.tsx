@@ -17,13 +17,25 @@ export default function QuickAdd({ at, onPick, onClose }: Props) {
   const [q, setQ] = useState("");
   const [sel, setSel] = useState(0);
   const [libEntries, setLibEntries] = useState<QuickAddEntry[]>([]);
+  const [libError, setLibError] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const restoreRef = useRef<HTMLElement | null>(null);
 
-  useEffect(() => { inputRef.current?.focus(); }, []);
+  // Capture the previously focused element on mount; restore it on unmount
+  // (covers every close path: Escape, backdrop click, pick).
+  useEffect(() => {
+    restoreRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    inputRef.current?.focus();
+    return () => {
+      const el = restoreRef.current;
+      if (el && document.contains(el)) el.focus();
+    };
+  }, []);
+
   useEffect(() => {
     fetch("/api/library").then(r => r.json()).then((items: { id: number; title: string; category_name: string }[]) =>
       setLibEntries(items.map(i => ({ label: `📚 ${i.title}`, type: "library", data: { libraryItemId: i.id, title: i.title, categoryName: i.category_name } })))
-    ).catch(() => {});
+    ).catch(() => setLibError(true));
   }, []);
 
   const results = useMemo(() => {
@@ -35,22 +47,29 @@ export default function QuickAdd({ at, onPick, onClose }: Props) {
 
   return (
     <div className="quickadd-backdrop" onClick={onClose}>
-      <div className="quickadd" onClick={e => e.stopPropagation()}>
-        <input ref={inputRef} aria-label="Quick add node" placeholder="Type to add a node… (quiz, pdf, flash…)" value={q}
+      <div
+        className="quickadd"
+        onClick={e => e.stopPropagation()}
+        onKeyDown={e => { if (e.key === "Escape") onClose(); }}
+      >
+        <input ref={inputRef} role="combobox" aria-expanded="true" aria-controls="qa-listbox"
+          aria-activedescendant={results.length > 0 ? `qa-opt-${sel}` : undefined}
+          aria-label="Quick add node" placeholder="Type to add a node… (quiz, pdf, flash…)" value={q}
           onChange={e => setQ(e.target.value)}
           onKeyDown={e => {
-            if (e.key === "Escape") onClose();
             if (e.key === "ArrowDown") { e.preventDefault(); setSel(s => Math.min(s + 1, results.length - 1)); }
             if (e.key === "ArrowUp") { e.preventDefault(); setSel(s => Math.max(s - 1, 0)); }
             if (e.key === "Enter" && results[sel]) onPick(results[sel], at);
           }} />
-        <div className="quickadd-list" role="listbox">
+        <div className="quickadd-list" id="qa-listbox" role="listbox">
           {results.map((r, i) => (
-            <button type="button" key={r.label + i} role="option" aria-selected={i === sel}
+            <button type="button" key={r.label + i} id={`qa-opt-${i}`} role="option" aria-selected={i === sel}
+              tabIndex={-1}
               className={`quickadd-row ${i === sel ? "quickadd-sel" : ""}`}
               onMouseEnter={() => setSel(i)} onClick={() => onPick(r, at)}>{r.label}</button>
           ))}
           {results.length === 0 && <div className="quickadd-empty">No match</div>}
+          {libError && <div className="quickadd-empty">Library unavailable — showing built-ins</div>}
         </div>
       </div>
     </div>

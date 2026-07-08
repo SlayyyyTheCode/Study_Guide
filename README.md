@@ -40,6 +40,28 @@ Open http://localhost:3000
 Notes from Notability/Notion: export as PDF from the app, then drop the PDF in.
 Everything auto-saves to a local SQLite file (`data.sqlite`); uploads stay in `uploads/`.
 
+## Library
+
+Everything you upload is auto-saved to the **Library** (📚 in the top bar),
+categorized by workflow name. Save any generated result with the 💾 button on
+its panel. In the drawer: search, rename, re-categorize, preview (flashcard
+decks and mind maps open interactively), and **drag any item — or a whole
+category — onto the canvas** to use it as input material in a new workflow.
+Library items survive workflow deletion.
+
+## More nodes
+
+- **🃏 Flashcards** — flip-through deck with Got it / Missed tracking and
+  review-misses replay.
+- **🕸️ Mind Map** — collapsible outline + graph view, copy as markdown.
+- **📚 Library item** — recall stored content (drag from drawer or Ctrl+K).
+
+## Shortcuts
+
+- **Ctrl+K** (or double-click the canvas) — quick-add any node by typing.
+- **Space** — flip the current flashcard.
+- **Esc** — close panels.
+
 ## Tests
 
 ```

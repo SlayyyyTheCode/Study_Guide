@@ -63,7 +63,10 @@ export function updateLibraryItem(db: DB, id: number, patch: { title?: string; c
   if (patch.categoryId !== undefined) db.prepare("UPDATE library_items SET category_id = ? WHERE id = ?").run(patch.categoryId, id);
 }
 export function deleteLibraryItem(db: DB, id: number): void {
-  db.prepare("DELETE FROM library_items WHERE id = ?").run(id);
+  db.transaction(() => {
+    db.prepare("DELETE FROM flashcard_reviews WHERE library_item_id = ?").run(id);
+    db.prepare("DELETE FROM library_items WHERE id = ?").run(id);
+  })();
 }
 /** Snapshot an uploaded text file into the library under a category named after its workflow. */
 export function captureFileToLibrary(

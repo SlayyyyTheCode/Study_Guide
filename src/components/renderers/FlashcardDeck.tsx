@@ -1,10 +1,12 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Card } from "@/lib/parse";
+import { cardsToTsv, sanitizeFilename } from "@/lib/anki";
+import { downloadTextFile } from "@/lib/download";
 
-interface Props { cards: Card[]; runId?: number; libraryItemId?: number; }
+interface Props { cards: Card[]; runId?: number; libraryItemId?: number; sourceIds?: number[]; title?: string; }
 
-export default function FlashcardDeck({ cards, runId, libraryItemId }: Props) {
+export default function FlashcardDeck({ cards, runId, libraryItemId, sourceIds, title }: Props) {
   const [order, setOrder] = useState<number[]>(() => cards.map((_, i) => i));
   const [pos, setPos] = useState(0);
   const [flipped, setFlipped] = useState(false);
@@ -38,6 +40,10 @@ export default function FlashcardDeck({ cards, runId, libraryItemId }: Props) {
     setOrder(nextOrder); setPos(0); setResults({}); setFlipped(false);
   }
 
+  function exportAnki() {
+    downloadTextFile(`${sanitizeFilename(title ?? "flashcards")}.txt`, cardsToTsv(cards));
+  }
+
   useEffect(() => {
     if (!done || order.length === 0 || postedRef.current) return;
     postedRef.current = true;
@@ -45,7 +51,10 @@ export default function FlashcardDeck({ cards, runId, libraryItemId }: Props) {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({
         runId, libraryItemId,
-        results: order.map(i => ({ front: cards[i].front, back: cards[i].back, missed: !!results[i] })),
+        results: order.map(i => ({
+          front: cards[i].front, back: cards[i].back, missed: !!results[i],
+          ...(sourceIds ? { libraryItemId: sourceIds[i] } : {}),
+        })),
       }),
     }).catch(() => {});
   }, [done]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -63,6 +72,9 @@ export default function FlashcardDeck({ cards, runId, libraryItemId }: Props) {
           )}
           <button type="button" className="node-btn" onClick={() => restart(cards.map((_, i) => i))}>
             Restart
+          </button>
+          <button type="button" className="node-btn" onClick={exportAnki} aria-label="Export deck to Anki">
+            ⬇ Export to Anki (.txt)
           </button>
         </div>
       </div>

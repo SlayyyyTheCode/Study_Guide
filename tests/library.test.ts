@@ -65,6 +65,15 @@ describe("library", () => {
     expect(getLibraryItem(db, item.id)).toBeUndefined();
   });
 
+  it("deleteLibraryItem cascades its flashcard_reviews rows", () => {
+    const bio = ensureCategory(db, "Biology");
+    const item = createLibraryItem(db, { title: "Deck", kind: "result", content_md: "{}", categoryId: bio.id, method: "flashcards" });
+    db.prepare("INSERT INTO flashcard_reviews (library_item_id, front, back) VALUES (?,?,?)").run(item.id, "Q", "A");
+    deleteLibraryItem(db, item.id);
+    const remaining = db.prepare("SELECT COUNT(*) AS n FROM flashcard_reviews WHERE library_item_id = ?").get(item.id) as { n: number };
+    expect(remaining.n).toBe(0);
+  });
+
   it("renameCategory works", () => {
     const c = ensureCategory(db, "Bio");
     renameCategory(db, c.id, "Biology 2");
@@ -96,5 +105,14 @@ describe("library", () => {
     const item = captureFileToLibrary(db, undefined, "orphan.md", "text", "/uploads/9/orphan.md");
     const cat = listCategories(db).find(c => c.id === item.category_id)!;
     expect(cat.name).toBe("Uncategorized");
+  });
+
+  it("listLibraryItems reports due flashcard count per item", () => {
+    const cat = ensureCategory(db, "Bio");
+    const item = createLibraryItem(db, { title: "Cells", kind: "result", content_md: "{}", categoryId: cat.id, method: "flashcards" });
+    db.prepare("INSERT INTO flashcard_reviews (library_item_id, front, back, next_review_at) VALUES (?,?,?,?)").run(item.id, "f1", "b1", null);
+    db.prepare("INSERT INTO flashcard_reviews (library_item_id, front, back, next_review_at) VALUES (?,?,?,?)").run(item.id, "f2", "b2", "2999-01-01 00:00:00");
+    const meta = listLibraryItems(db, {}).find(i => i.id === item.id)!;
+    expect(meta.due_count).toBe(1);
   });
 });

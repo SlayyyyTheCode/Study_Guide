@@ -79,14 +79,41 @@ CREATE TABLE IF NOT EXISTS flashcard_reviews (
   front TEXT NOT NULL,
   back TEXT NOT NULL,
   missed INTEGER NOT NULL DEFAULT 0,
+  ease_factor REAL NOT NULL DEFAULT 2.5,
+  interval_days INTEGER NOT NULL DEFAULT 0,
+  repetitions INTEGER NOT NULL DEFAULT 0,
+  next_review_at TEXT,
   last_reviewed TEXT NOT NULL DEFAULT (datetime('now'))
 );
+CREATE INDEX IF NOT EXISTS idx_flashcard_reviews_library_item ON flashcard_reviews(library_item_id);
 `;
+
+/**
+ * Fresh databases get the SM-2 columns straight from CREATE TABLE above.
+ * A user's existing data.sqlite predates them, so add them defensively —
+ * SQLite has no `ADD COLUMN IF NOT EXISTS`, hence the table_info check.
+ */
+export function migrateFlashcardReviewColumns(db: DB): void {
+  const cols = (db.prepare("PRAGMA table_info(flashcard_reviews)").all() as { name: string }[]).map(c => c.name);
+  if (!cols.includes("ease_factor")) db.exec("ALTER TABLE flashcard_reviews ADD COLUMN ease_factor REAL NOT NULL DEFAULT 2.5");
+  if (!cols.includes("interval_days")) db.exec("ALTER TABLE flashcard_reviews ADD COLUMN interval_days INTEGER NOT NULL DEFAULT 0");
+  if (!cols.includes("repetitions")) db.exec("ALTER TABLE flashcard_reviews ADD COLUMN repetitions INTEGER NOT NULL DEFAULT 0");
+  if (!cols.includes("next_review_at")) {
+    db.exec("ALTER TABLE flashcard_reviews ADD COLUMN next_review_at TEXT");
+    // Backfill pre-existing rows to "due now" instead of leaving them NULL — NULL is
+    // sorted first by getWeakSpots' ORDER BY, so unbackfilled legacy rows would bury
+    // genuinely overdue/high-miss cards under LIMIT 20. Only runs once, right after
+    // the column is added; post-migration NULL should never occur again since
+    // upsertFlashcardResult always sets next_review_at on insert for library-scoped rows.
+    db.exec("UPDATE flashcard_reviews SET next_review_at = datetime('now') WHERE next_review_at IS NULL");
+  }
+}
 
 export function openDb(file: string): DB {
   const db = new Database(file);
   db.pragma("journal_mode = WAL");
   db.exec(SCHEMA);
+  migrateFlashcardReviewColumns(db);
   return db;
 }
 

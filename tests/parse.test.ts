@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseJsonBlock, parseCards, parseMindmap } from "@/lib/parse";
+import { parseJsonBlock, parseCards, parseMindmap, parseQuizResults, stripTrailingJsonBlock } from "@/lib/parse";
 
 const wrap = (j: string) => "intro text\n```json\n" + j + "\n```\ntrailing";
 
@@ -22,5 +22,23 @@ describe("parse", () => {
     expect(t?.root).toBe("Bio");
     expect(t?.children[0].children?.[0].label).toBe("Organelles");
     expect(parseMindmap(wrap('{"children":[]}'))).toBeNull();
+  });
+  it("parseQuizResults validates shape", () => {
+    expect(parseQuizResults(wrap('{"results":[{"id":1,"correct":true},{"id":2,"correct":false}]}')))
+      .toEqual([{ id: 1, correct: true }, { id: 2, correct: false }]);
+    expect(parseQuizResults(wrap('{"results":"nope"}'))).toBeNull();
+    expect(parseQuizResults(wrap('{"results":[{"id":1}]}'))).toBeNull();
+  });
+  it("parseQuizResults coerces numeric-string ids", () => {
+    expect(parseQuizResults(wrap('{"results":[{"id":"1","correct":true},{"id":2,"correct":false}]}')))
+      .toEqual([{ id: 1, correct: true }, { id: 2, correct: false }]);
+    expect(parseQuizResults(wrap('{"results":[{"id":"not-a-number","correct":true}]}'))).toBeNull();
+  });
+  it("stripTrailingJsonBlock removes the last fenced json block but leaves other content", () => {
+    const md = "Q1 correct. Q2 wrong. SCORE: 1/2\n```json\n{\"results\":[{\"id\":1,\"correct\":true}]}\n```";
+    expect(stripTrailingJsonBlock(md)).toBe("Q1 correct. Q2 wrong. SCORE: 1/2");
+  });
+  it("stripTrailingJsonBlock is a no-op when there is no fenced json block", () => {
+    expect(stripTrailingJsonBlock("plain text, no fences")).toBe("plain text, no fences");
   });
 });

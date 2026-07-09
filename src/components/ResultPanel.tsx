@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { useApp, readSse } from "@/store";
-import { parseCards, parseMindmap } from "@/lib/parse";
+import { parseCards, parseMindmap, parseQuizResults, stripTrailingJsonBlock } from "@/lib/parse";
 import { METHODS, type MethodId } from "@/lib/prompts";
 
 const FOLLOW_UP_PLACEHOLDERS: Partial<Record<MethodId, string>> = {
@@ -141,11 +141,15 @@ export default function ResultPanel() {
     const answers = quizAnswers;
     const answerText = answered.map(q => `Q${q.id}: ${answers[q.id] ?? "(blank)"}`).join("\n");
     const feedback = await send(`My answers:\n${answerText}\n\nGrade them.`);
+    const results = parseQuizResults(feedback);
     await fetch("/api/quiz", {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({
         runId: openRunId,
-        attempts: answered.map(q => ({ question: q.question, user_answer: answers[q.id] ?? "", correct: null, feedback })),
+        attempts: answered.map(q => {
+          const r = results?.find(x => x.id === q.id);
+          return { question: q.question, user_answer: answers[q.id] ?? "", correct: r ? r.correct : null, feedback };
+        }),
       }),
     });
   }
@@ -181,12 +185,17 @@ export default function ResultPanel() {
         {thread.slice(1).map((m, i) => {
           const idx = i + 1; // account for the slice(1) offset
           if (m.role === "assistant" && cardsSrc?.idx === idx)
-            return <div key={i} className="msg msg-assistant"><FlashcardDeck key={cardsSrc.idx} cards={cardsSrc.cards} runId={openRunId ?? undefined} /></div>;
+            return <div key={i} className="msg msg-assistant"><FlashcardDeck key={cardsSrc.idx} cards={cardsSrc.cards} runId={openRunId ?? undefined} title={methodLabel} /></div>;
           if (m.role === "assistant" && mindmapSrc?.idx === idx)
             return <div key={i} className="msg msg-assistant"><MindMapView key={mindmapSrc.idx} map={mindmapSrc.map} /></div>;
+          const displayContent = m.role === "assistant" && openMethod === "quiz" ? stripTrailingJsonBlock(m.content) : m.content;
+          // A quiz-generation message is entirely a JSON fence with no prose,
+          // so stripping it leaves nothing to show — the quiz form below
+          // (derived separately from quizSrc) is the actual rendering of it.
+          if (m.role === "assistant" && displayContent.trim() === "") return null;
           return (
             <div key={i} className={`msg msg-${m.role}`}>
-              {m.role === "assistant" ? <ReactMarkdown>{m.content}</ReactMarkdown> : <em>{m.content}</em>}
+              {m.role === "assistant" ? <ReactMarkdown>{displayContent}</ReactMarkdown> : <em>{m.content}</em>}
             </div>
           );
         })}

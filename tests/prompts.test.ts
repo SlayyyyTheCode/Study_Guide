@@ -45,4 +45,8 @@ describe("prompts", () => {
     const p = buildMethodPrompt("quiz", material, {});
     expect(p.system).toMatch(/interleave/i);
   });
+  it("quiz system requests a parseable per-question results block after grading", () => {
+    const p = buildMethodPrompt("quiz", material, {});
+    expect(p.system).toMatch(/"results"/);
+  });
 });

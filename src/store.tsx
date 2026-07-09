@@ -23,6 +23,10 @@ interface AppState {
   setLibraryPreviewId: (id: number | null) => void;
   snap: boolean;
   setSnap: (v: boolean) => void;
+  weakSpotsOpen: boolean;
+  setWeakSpotsOpen: (v: boolean) => void;
+  statsOpen: boolean;
+  setStatsOpen: (v: boolean) => void;
 }
 
 const Ctx = createContext<AppState | null>(null);
@@ -40,20 +44,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [libraryPreviewId, setLibraryPreviewIdRaw] = useState<number | null>(null);
   const [snap, setSnap] = useState(true);
-  // Run result and library preview are mutually exclusive panel modes:
-  // opening one closes the other (also guarantees a single Escape listener).
+  const [weakSpotsOpen, setWeakSpotsOpenRaw] = useState(false);
+  const [statsOpen, setStatsOpenRaw] = useState(false);
+  // Run result, library preview, weak spots, and stats are mutually exclusive panel modes:
+  // opening one closes the others (also guarantees a single Escape listener, and avoids
+  // stacking two identical fixed full-height overlays on top of each other).
   const setOpenRunId = useCallback((id: number | null) => {
     setOpenRunIdRaw(id);
-    if (id !== null) setLibraryPreviewIdRaw(null);
+    if (id !== null) { setLibraryPreviewIdRaw(null); setWeakSpotsOpenRaw(false); setStatsOpenRaw(false); }
   }, []);
   const setLibraryPreviewId = useCallback((id: number | null) => {
     setLibraryPreviewIdRaw(id);
-    if (id !== null) setOpenRunIdRaw(null);
+    if (id !== null) { setOpenRunIdRaw(null); setWeakSpotsOpenRaw(false); setStatsOpenRaw(false); }
+  }, []);
+  const setWeakSpotsOpen = useCallback((v: boolean) => {
+    setWeakSpotsOpenRaw(v);
+    if (v) { setOpenRunIdRaw(null); setLibraryPreviewIdRaw(null); setStatsOpenRaw(false); }
+  }, []);
+  const setStatsOpen = useCallback((v: boolean) => {
+    setStatsOpenRaw(v);
+    if (v) { setOpenRunIdRaw(null); setLibraryPreviewIdRaw(null); setWeakSpotsOpenRaw(false); }
   }, []);
   return (
     <Ctx.Provider value={{
       workflowId, setWorkflowId, openRunId, setOpenRunId, openMethod, setOpenMethod, plan, setPlan, brains, setBrains,
       runningOutputs, setRunning, drawerOpen, setDrawerOpen, libraryPreviewId, setLibraryPreviewId, snap, setSnap,
+      weakSpotsOpen, setWeakSpotsOpen, statsOpen, setStatsOpen,
     }}>
       {children}
     </Ctx.Provider>

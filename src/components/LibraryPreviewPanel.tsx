@@ -2,11 +2,12 @@
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { useApp } from "@/store";
-import { parseCards, parseMindmap } from "@/lib/parse";
+import { parseCards, parseMindmap, type Card } from "@/lib/parse";
 import FlashcardDeck from "@/components/renderers/FlashcardDeck";
 import MindMapView from "@/components/renderers/MindMapView";
 
 interface LibraryItem { id: number; title: string; kind: string; content_md: string; method: string | null; category_id: number; }
+interface ReviewRow { front: string; next_review_at: string | null; }
 
 /** Read-only preview of a saved library item (no follow-up input). */
 export default function LibraryPreviewPanel() {
@@ -14,6 +15,7 @@ export default function LibraryPreviewPanel() {
   const [item, setItem] = useState<LibraryItem | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [dueCards, setDueCards] = useState<Card[] | null>(null);
   const previewRef = useRef<number | null>(null);
   previewRef.current = libraryPreviewId;
 
@@ -37,6 +39,26 @@ export default function LibraryPreviewPanel() {
     return () => window.removeEventListener("keydown", onKey);
   }, [libraryPreviewId, setLibraryPreviewId]);
 
+  useEffect(() => {
+    if (!item || item.method !== "flashcards") { setDueCards(null); return; }
+    const cards = parseCards(item.content_md);
+    if (!cards) { setDueCards(null); return; }
+    const id = item.id;
+    setDueCards(null); // clear any stale previous item's dueCards while this fetch is in flight
+    fetch(`/api/flashcards?libraryItemId=${id}`)
+      .then(r => r.ok ? r.json() : [])
+      .then((reviews: ReviewRow[]) => {
+        if (previewRef.current !== id) return;
+        const nowSql = new Date().toISOString().slice(0, 19).replace("T", " "); // match SQLite datetime('now') format
+        const due = cards.filter(c => {
+          const r = reviews.find(x => x.front === c.front);
+          return !r || !r.next_review_at || r.next_review_at <= nowSql;
+        });
+        setDueCards(due.length > 0 ? due : cards);
+      })
+      .catch(() => { if (previewRef.current === id) setDueCards(cards); });
+  }, [item]);
+
   if (!libraryPreviewId) return null;
 
   const cards = item?.method === "flashcards" ? parseCards(item.content_md) : null;
@@ -54,7 +76,7 @@ export default function LibraryPreviewPanel() {
         {loading && !item && <div className="node-sub">Loading…</div>}
         {error && <p className="lib-error" role="alert">{error}</p>}
         {item && (
-          cards ? <FlashcardDeck key={item.id} cards={cards} libraryItemId={item.id} />
+          cards ? <FlashcardDeck key={item.id} cards={dueCards ?? cards} libraryItemId={item.id} title={item.title} />
           : map ? <MindMapView key={item.id} map={map} />
           : <ReactMarkdown>{item.content_md}</ReactMarkdown>
         )}

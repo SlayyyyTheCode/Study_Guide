@@ -43,7 +43,11 @@ When asked to generate: output ONLY a JSON code block containing an array of que
  {"id":2,"type":"short","question":"...","answer":"expected key points"}]
 \`\`\`
 Question stems must stay under ~25 words. If the study material contains multiple "--- Title ---" sections, deliberately interleave questions across sections instead of grouping all questions from one source together — mixing topics during practice beats blocking one topic at a time.
-When the student submits answers: grade each one in 1-2 sentences, state correct/incorrect, explain why, and end with a score line "SCORE: x/y". Respond in markdown (JSON only for generation).`;
+When the student submits answers: grade each one in 1-2 sentences, state correct/incorrect, explain why, and end with a score line "SCORE: x/y". Then, on its own line, output one more fenced JSON block with the per-question results:
+\`\`\`json
+{"results":[{"id":1,"correct":true},{"id":2,"correct":false}]}
+\`\`\`
+Always include that results block after grading — it is read by the app, not shown to the student. Respond in markdown (JSON only for generation; prose + SCORE line + results block for grading).`;
 
 const SUMMARY_SYSTEM = `${CONCISE_RULE}
 You produce condensed exam cheat sheets: key concepts, definitions, formulas, and memory hooks. Dense but scannable markdown with headings and bullet lists. Target one scannable screen (~200-300 words) unless the material is unusually large. No filler prose.`;

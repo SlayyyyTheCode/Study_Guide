@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useApp } from "@/store";
 
 interface Cat { id: number; name: string; icon: string; }
-interface Item { id: number; category_id: number; title: string; kind: string; method: string | null; created_at: string; category_name: string; }
+interface Item { id: number; category_id: number; title: string; kind: string; method: string | null; created_at: string; category_name: string; due_count: number; }
 
 export default function LibraryDrawer() {
   const { drawerOpen, setDrawerOpen, setLibraryPreviewId } = useApp();
@@ -99,7 +99,12 @@ export default function LibraryDrawer() {
                   onDragStart={e => e.dataTransfer.setData("application/sg-library",
                     JSON.stringify({ itemId: item.id, title: item.title, categoryName: item.category_name }))}>
                   <span className="lib-item-title" onClick={() => setLibraryPreviewId(item.id)}
-                    title="Preview">{item.kind === "file" ? "📄" : "📋"} {item.title}</span>
+                    title="Preview">
+                    {item.kind === "file" ? "📄" : "📋"} {item.title}
+                    {item.method === "flashcards" && item.due_count > 0 && (
+                      <span className="lib-due-badge">{item.due_count} due</span>
+                    )}
+                  </span>
                   <span className="lib-item-date">{item.created_at.slice(0, 10)}</span>
                   <span className="lib-actions">
                     <button type="button" className="node-btn" aria-label={`Rename ${item.title}`} onClick={() => rename(item)}>✎</button>

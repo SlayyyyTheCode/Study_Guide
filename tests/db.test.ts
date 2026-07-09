@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { openDb, createWorkflow, listWorkflows, saveCanvas, getWorkflow, deleteWorkflow } from "@/lib/db";
+import Database from "better-sqlite3";
+import { openDb, createWorkflow, listWorkflows, saveCanvas, getWorkflow, deleteWorkflow, migrateFlashcardReviewColumns } from "@/lib/db";
 
 describe("db", () => {
   it("creates schema and round-trips a workflow", () => {
@@ -35,5 +36,18 @@ describe("db", () => {
     expect(db.prepare("SELECT COUNT(*) AS c FROM runs WHERE workflow_id = ?").get(wf.id)).toEqual({ c: 0 });
     expect(db.prepare("SELECT COUNT(*) AS c FROM quiz_attempts WHERE run_id = ?").get(runId)).toEqual({ c: 0 });
     expect(db.prepare("SELECT COUNT(*) AS c FROM pomodoro_blocks WHERE workflow_id = ?").get(wf.id)).toEqual({ c: 0 });
+  });
+
+  it("migrateFlashcardReviewColumns adds SM-2 columns to a pre-v3 table", () => {
+    const raw = new Database(":memory:");
+    raw.exec(`CREATE TABLE flashcard_reviews (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, run_id INTEGER, library_item_id INTEGER,
+      front TEXT NOT NULL, back TEXT NOT NULL, missed INTEGER NOT NULL DEFAULT 0,
+      last_reviewed TEXT NOT NULL DEFAULT (datetime('now'))
+    )`);
+    migrateFlashcardReviewColumns(raw);
+    const cols = (raw.prepare("PRAGMA table_info(flashcard_reviews)").all() as { name: string }[]).map(c => c.name);
+    expect(cols).toEqual(expect.arrayContaining(["ease_factor", "interval_days", "repetitions", "next_review_at"]));
+    raw.close();
   });
 });

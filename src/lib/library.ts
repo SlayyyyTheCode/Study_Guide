@@ -5,7 +5,7 @@ export interface LibraryItemRow {
   id: number; category_id: number; title: string; kind: "file" | "result";
   content_md: string; source_path: string | null; method: string | null; created_at: string;
 }
-export type LibraryItemMeta = Omit<LibraryItemRow, "content_md"> & { category_name: string };
+export type LibraryItemMeta = Omit<LibraryItemRow, "content_md"> & { category_name: string; due_count: number };
 
 export function ensureCategory(db: DB, name: string, icon = "📁"): CategoryRow {
   db.prepare("INSERT OR IGNORE INTO categories (name, icon) VALUES (?, ?)").run(name, icon);
@@ -47,8 +47,14 @@ export function listLibraryItems(db: DB, f: { search?: string; categoryId?: numb
   }
   if (f.categoryId) { where.push("li.category_id = ?"); args.push(f.categoryId); }
   const sql = `SELECT li.id, li.category_id, li.title, li.kind, li.source_path, li.method, li.created_at,
-                      c.name AS category_name
-               FROM library_items li JOIN categories c ON c.id = li.category_id
+                      c.name AS category_name, COALESCE(due.cnt, 0) AS due_count
+               FROM library_items li
+               JOIN categories c ON c.id = li.category_id
+               LEFT JOIN (
+                 SELECT library_item_id, COUNT(*) AS cnt FROM flashcard_reviews
+                 WHERE library_item_id IS NOT NULL AND (next_review_at IS NULL OR next_review_at <= datetime('now'))
+                 GROUP BY library_item_id
+               ) due ON due.library_item_id = li.id
                ${where.length ? "WHERE " + where.join(" AND ") : ""} ORDER BY li.created_at DESC`;
   return db.prepare(sql).all(...args) as LibraryItemMeta[];
 }

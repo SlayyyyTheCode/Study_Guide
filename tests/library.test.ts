@@ -97,4 +97,13 @@ describe("library", () => {
     const cat = listCategories(db).find(c => c.id === item.category_id)!;
     expect(cat.name).toBe("Uncategorized");
   });
+
+  it("listLibraryItems reports due flashcard count per item", () => {
+    const cat = ensureCategory(db, "Bio");
+    const item = createLibraryItem(db, { title: "Cells", kind: "result", content_md: "{}", categoryId: cat.id, method: "flashcards" });
+    db.prepare("INSERT INTO flashcard_reviews (library_item_id, front, back, next_review_at) VALUES (?,?,?,?)").run(item.id, "f1", "b1", null);
+    db.prepare("INSERT INTO flashcard_reviews (library_item_id, front, back, next_review_at) VALUES (?,?,?,?)").run(item.id, "f2", "b2", "2999-01-01 00:00:00");
+    const meta = listLibraryItems(db, {}).find(i => i.id === item.id)!;
+    expect(meta.due_count).toBe(1);
+  });
 });

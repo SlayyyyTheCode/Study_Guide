@@ -195,3 +195,5 @@ button { font: inherit; cursor: pointer; }
 .minimap-float .react-flow__minimap { border: 1px solid var(--border); border-radius: 0 0 8px 8px; }
 
 .weakspot-quiz-item { border-top: 1px dashed var(--border); padding: 8px 0; font-size: 13px; }
+
+.lib-due-badge { margin-left: 6px; font-size: 10px; padding: 1px 6px; border-radius: 10px; background: var(--amber); color: #1a1400; }

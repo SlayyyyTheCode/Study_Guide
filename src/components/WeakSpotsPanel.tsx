@@ -16,14 +16,9 @@ export default function WeakSpotsPanel() {
   const [quizMisses, setQuizMisses] = useState<QuizMiss[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  // Bumped on every load() call; passed as FlashcardDeck's key so a fresh load
-  // always forces a clean remount instead of reusing stale order/pos/results
-  // state against new cards/sourceIds props (which could otherwise post SM-2
-  // results against the wrong library_item_id — see ResultPanel's cardsSrc.idx).
-  const [loadSeq, setLoadSeq] = useState(0);
 
   const load = useCallback(() => {
-    setLoading(true); setError(""); setLoadSeq(s => s + 1);
+    setLoading(true); setError("");
     fetch("/api/weakspots")
       .then(r => { if (!r.ok) throw new Error(`Could not load weak spots (${r.status})`); return r.json(); })
       .then((d: { cards: WeakCard[]; quizMisses: QuizMiss[] }) => { setCards(d.cards); setQuizMisses(d.quizMisses); })
@@ -65,7 +60,12 @@ export default function WeakSpotsPanel() {
         {cards.length > 0 && (
           <>
             <h3>Due / struggling flashcards</h3>
-            <FlashcardDeck key={loadSeq} cards={deckCards} sourceIds={sourceIds} title="weak-spot-review" />
+            {/* Keyed by the resolved card set (not a fetch-start counter) so the
+                deck only remounts once the new cards/sourceIds are actually in
+                state — otherwise a stale order/pos/results could be reused
+                against the new props and post SM-2 results against the wrong
+                library_item_id (see ResultPanel's cardsSrc.idx). */}
+            <FlashcardDeck key={cards.map(c => c.id).join("|")} cards={deckCards} sourceIds={sourceIds} title="weak-spot-review" />
           </>
         )}
         {quizMisses.length > 0 && (

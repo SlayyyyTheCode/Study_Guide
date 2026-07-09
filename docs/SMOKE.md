@@ -33,3 +33,13 @@
 - [ ] Oxbridge Tutorial run → asks one question at a time (never a list), reply box shows tutorial placeholder, pushes back on a weak answer instead of just saying "correct"
 - [ ] Quiz wired to two file inputs → questions mix across both sources instead of grouping by source
 - [ ] Existing outputs (Feynman/PQ4R/Quiz/Summary/Flashcards/Mind Map/Chat) read noticeably shorter and more direct than before
+
+## v3 additions
+- [ ] Answer flashcards in a saved deck across two sessions → Library drawer shows a "N due" badge that shrinks as cards are reviewed and their scheduled interval grows
+- [ ] Miss a card twice → it still shows as due regardless of its scheduled date (high-miss override)
+- [ ] Submit a quiz → check the SCORE line's math matches the app's later display of correct/incorrect (grading now records real values, not always blank); the raw results JSON block is not shown in the chat transcript
+- [ ] 🔥 Weak Spots → shows due/struggling flashcards from multiple different decks mixed together, plus a missed-quiz recap; answering a card here updates the same due badge in the drawer
+- [ ] Weak Spots with nothing due/missed → shows the empty-state message, not a blank panel
+- [ ] 📊 Stats → streak, study time, quiz trend, flashcard mastery, weakest categories/topics all show sane numbers (or "no data yet") even on a lightly-used profile
+- [ ] Export a flashcard deck to Anki → downloaded .txt imports cleanly via Anki's File → Import (or at minimum, front/back columns are correctly tab-separated when opened in a text editor)
+- [ ] Weak Spots, Stats, Library drawer, and any result/preview panel are mutually exclusive — opening one closes the others, no stacked overlays

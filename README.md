@@ -65,6 +65,24 @@ instead of grouping by source — mixed-topic practice, shown to beat blocking
 one topic at a time. All outputs default to short, direct answers; ask for
 more depth in the follow-up box if you want it.
 
+## Spaced repetition, weak spots & analytics
+
+Saved flashcard decks use SM-2 spaced repetition: each card gets its own
+schedule based on your Got it / Missed history, and the Library drawer shows
+a **"N due"** badge — opening the deck reviews only what's due today (falls
+back to the full deck if nothing is due). Unsaved in-thread decks stay
+simple, no scheduling.
+
+**🔥 Weak Spots** (top bar) pulls together the flashcards due or you've been
+missing across *every* saved deck, plus a recap of recently missed quiz
+questions — one place to see what needs work.
+
+**📊 Stats** (top bar) shows your study streak, time studied, quiz score
+trend, flashcard mastery ratio, and weakest categories/topics.
+
+Any flashcard deck — in-thread or saved — has an **⬇ Export to Anki (.txt)**
+button on its end screen. Anki's File → Import reads it directly.
+
 ## Shortcuts
 
 - **Ctrl+K** (or double-click the canvas) — quick-add any node by typing.

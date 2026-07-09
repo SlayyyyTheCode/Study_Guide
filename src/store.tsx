@@ -42,16 +42,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [libraryPreviewId, setLibraryPreviewIdRaw] = useState<number | null>(null);
   const [snap, setSnap] = useState(true);
-  const [weakSpotsOpen, setWeakSpotsOpen] = useState(false);
-  // Run result and library preview are mutually exclusive panel modes:
-  // opening one closes the other (also guarantees a single Escape listener).
+  const [weakSpotsOpen, setWeakSpotsOpenRaw] = useState(false);
+  // Run result, library preview, and weak spots are mutually exclusive panel modes:
+  // opening one closes the others (also guarantees a single Escape listener).
   const setOpenRunId = useCallback((id: number | null) => {
     setOpenRunIdRaw(id);
-    if (id !== null) setLibraryPreviewIdRaw(null);
+    if (id !== null) { setLibraryPreviewIdRaw(null); setWeakSpotsOpenRaw(false); }
   }, []);
   const setLibraryPreviewId = useCallback((id: number | null) => {
     setLibraryPreviewIdRaw(id);
-    if (id !== null) setOpenRunIdRaw(null);
+    if (id !== null) { setOpenRunIdRaw(null); setWeakSpotsOpenRaw(false); }
+  }, []);
+  const setWeakSpotsOpen = useCallback((v: boolean) => {
+    setWeakSpotsOpenRaw(v);
+    if (v) { setOpenRunIdRaw(null); setLibraryPreviewIdRaw(null); }
   }, []);
   return (
     <Ctx.Provider value={{

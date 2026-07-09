@@ -16,13 +16,21 @@ export default function WeakSpotsPanel() {
   const [quizMisses, setQuizMisses] = useState<QuizMiss[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  // Bumped on every load() call; passed as FlashcardDeck's key so a fresh load
+  // always forces a clean remount instead of reusing stale order/pos/results
+  // state against new cards/sourceIds props (which could otherwise post SM-2
+  // results against the wrong library_item_id — see ResultPanel's cardsSrc.idx).
+  const [loadSeq, setLoadSeq] = useState(0);
 
   const load = useCallback(() => {
-    setLoading(true); setError("");
+    setLoading(true); setError(""); setLoadSeq(s => s + 1);
     fetch("/api/weakspots")
       .then(r => { if (!r.ok) throw new Error(`Could not load weak spots (${r.status})`); return r.json(); })
       .then((d: { cards: WeakCard[]; quizMisses: QuizMiss[] }) => { setCards(d.cards); setQuizMisses(d.quizMisses); })
-      .catch(e => setError(e instanceof Error ? e.message : "Could not load weak spots"))
+      .catch(e => {
+        setError(e instanceof Error ? e.message : "Could not load weak spots");
+        setCards([]); setQuizMisses([]);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -49,7 +57,7 @@ export default function WeakSpotsPanel() {
         </button>
       </div>
       <div className="result-body">
-        {loading && <p className="node-sub">Loading…</p>}
+        {loading && <p className="node-sub" role="status">Loading…</p>}
         {error && <p className="lib-error" role="alert">{error}</p>}
         {!loading && !error && cards.length === 0 && quizMisses.length === 0 && (
           <p className="lib-empty">Nothing due or missed right now — nice work! Come back after more study sessions.</p>
@@ -57,14 +65,14 @@ export default function WeakSpotsPanel() {
         {cards.length > 0 && (
           <>
             <h3>Due / struggling flashcards</h3>
-            <FlashcardDeck cards={deckCards} sourceIds={sourceIds} title="weak-spot-review" />
+            <FlashcardDeck key={loadSeq} cards={deckCards} sourceIds={sourceIds} title="weak-spot-review" />
           </>
         )}
         {quizMisses.length > 0 && (
           <>
             <h3>Recently missed quiz questions</h3>
-            {quizMisses.map((q, i) => (
-              <div key={i} className="weakspot-quiz-item">
+            {quizMisses.map(q => (
+              <div key={`${q.created_at}-${q.question}`} className="weakspot-quiz-item">
                 <div className="node-sub">{q.workflow_name} · {q.created_at.slice(0, 10)}</div>
                 <p><b>Q:</b> {q.question}</p>
                 <p><b>Your answer:</b> {q.user_answer}</p>

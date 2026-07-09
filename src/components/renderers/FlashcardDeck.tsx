@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Card } from "@/lib/parse";
+import { cardsToTsv, sanitizeFilename } from "@/lib/anki";
+import { downloadTextFile } from "@/lib/download";
 
 interface Props { cards: Card[]; runId?: number; libraryItemId?: number; sourceIds?: number[]; title?: string; }
 
@@ -38,6 +40,10 @@ export default function FlashcardDeck({ cards, runId, libraryItemId, sourceIds, 
     setOrder(nextOrder); setPos(0); setResults({}); setFlipped(false);
   }
 
+  function exportAnki() {
+    downloadTextFile(`${sanitizeFilename(title ?? "flashcards")}.txt`, cardsToTsv(cards));
+  }
+
   useEffect(() => {
     if (!done || order.length === 0 || postedRef.current) return;
     postedRef.current = true;
@@ -66,6 +72,9 @@ export default function FlashcardDeck({ cards, runId, libraryItemId, sourceIds, 
           )}
           <button type="button" className="node-btn" onClick={() => restart(cards.map((_, i) => i))}>
             Restart
+          </button>
+          <button type="button" className="node-btn" onClick={exportAnki} aria-label="Export deck to Anki">
+            ⬇ Export to Anki (.txt)
           </button>
         </div>
       </div>

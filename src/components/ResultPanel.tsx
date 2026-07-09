@@ -185,7 +185,7 @@ export default function ResultPanel() {
         {thread.slice(1).map((m, i) => {
           const idx = i + 1; // account for the slice(1) offset
           if (m.role === "assistant" && cardsSrc?.idx === idx)
-            return <div key={i} className="msg msg-assistant"><FlashcardDeck key={cardsSrc.idx} cards={cardsSrc.cards} runId={openRunId ?? undefined} /></div>;
+            return <div key={i} className="msg msg-assistant"><FlashcardDeck key={cardsSrc.idx} cards={cardsSrc.cards} runId={openRunId ?? undefined} title={methodLabel} /></div>;
           if (m.role === "assistant" && mindmapSrc?.idx === idx)
             return <div key={i} className="msg msg-assistant"><MindMapView key={mindmapSrc.idx} map={mindmapSrc.map} /></div>;
           const displayContent = m.role === "assistant" && openMethod === "quiz" ? stripTrailingJsonBlock(m.content) : m.content;

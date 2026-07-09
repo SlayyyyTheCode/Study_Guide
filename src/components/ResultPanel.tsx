@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { useApp, readSse } from "@/store";
-import { parseCards, parseMindmap } from "@/lib/parse";
+import { parseCards, parseMindmap, parseQuizResults } from "@/lib/parse";
 import { METHODS, type MethodId } from "@/lib/prompts";
 
 const FOLLOW_UP_PLACEHOLDERS: Partial<Record<MethodId, string>> = {
@@ -141,11 +141,15 @@ export default function ResultPanel() {
     const answers = quizAnswers;
     const answerText = answered.map(q => `Q${q.id}: ${answers[q.id] ?? "(blank)"}`).join("\n");
     const feedback = await send(`My answers:\n${answerText}\n\nGrade them.`);
+    const results = parseQuizResults(feedback);
     await fetch("/api/quiz", {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({
         runId: openRunId,
-        attempts: answered.map(q => ({ question: q.question, user_answer: answers[q.id] ?? "", correct: null, feedback })),
+        attempts: answered.map(q => {
+          const r = results?.find(x => x.id === q.id);
+          return { question: q.question, user_answer: answers[q.id] ?? "", correct: r ? r.correct : null, feedback };
+        }),
       }),
     });
   }

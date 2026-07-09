@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseJsonBlock, parseCards, parseMindmap } from "@/lib/parse";
+import { parseJsonBlock, parseCards, parseMindmap, parseQuizResults } from "@/lib/parse";
 
 const wrap = (j: string) => "intro text\n```json\n" + j + "\n```\ntrailing";
 
@@ -22,5 +22,11 @@ describe("parse", () => {
     expect(t?.root).toBe("Bio");
     expect(t?.children[0].children?.[0].label).toBe("Organelles");
     expect(parseMindmap(wrap('{"children":[]}'))).toBeNull();
+  });
+  it("parseQuizResults validates shape", () => {
+    expect(parseQuizResults(wrap('{"results":[{"id":1,"correct":true},{"id":2,"correct":false}]}')))
+      .toEqual([{ id: 1, correct: true }, { id: 2, correct: false }]);
+    expect(parseQuizResults(wrap('{"results":"nope"}'))).toBeNull();
+    expect(parseQuizResults(wrap('{"results":[{"id":1}]}'))).toBeNull();
   });
 });

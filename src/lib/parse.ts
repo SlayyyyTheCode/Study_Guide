@@ -26,3 +26,11 @@ export function parseMindmap(md: string): MindMap | null {
   if (!obj || typeof obj.root !== "string" || !Array.isArray(obj.children) || !obj.children.every(validNode)) return null;
   return obj;
 }
+
+export interface QuizResult { id: number; correct: boolean; }
+export function parseQuizResults(md: string): QuizResult[] | null {
+  const obj = parseJsonBlock<{ results?: unknown }>(md);
+  if (!obj || !Array.isArray(obj.results)) return null;
+  const ok = obj.results.every(r => r && typeof (r as QuizResult).id === "number" && typeof (r as QuizResult).correct === "boolean");
+  return ok ? (obj.results as QuizResult[]) : null;
+}

@@ -189,6 +189,10 @@ export default function ResultPanel() {
           if (m.role === "assistant" && mindmapSrc?.idx === idx)
             return <div key={i} className="msg msg-assistant"><MindMapView key={mindmapSrc.idx} map={mindmapSrc.map} /></div>;
           const displayContent = m.role === "assistant" && openMethod === "quiz" ? stripTrailingJsonBlock(m.content) : m.content;
+          // A quiz-generation message is entirely a JSON fence with no prose,
+          // so stripping it leaves nothing to show — the quiz form below
+          // (derived separately from quizSrc) is the actual rendering of it.
+          if (m.role === "assistant" && displayContent.trim() === "") return null;
           return (
             <div key={i} className={`msg msg-${m.role}`}>
               {m.role === "assistant" ? <ReactMarkdown>{displayContent}</ReactMarkdown> : <em>{m.content}</em>}

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useApp } from "@/store";
 
 interface DailyMinutes { date: string; minutes: number; }
@@ -18,14 +18,20 @@ export default function StatsPanel() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const seqRef = useRef(0); // stale-response guard
 
   const load = useCallback(() => {
+    const seq = ++seqRef.current;
     setLoading(true); setError("");
     fetch("/api/stats")
       .then(r => { if (!r.ok) throw new Error(`Could not load stats (${r.status})`); return r.json(); })
-      .then(setStats)
-      .catch(e => setError(e instanceof Error ? e.message : "Could not load stats"))
-      .finally(() => setLoading(false));
+      .then(d => { if (seq !== seqRef.current) return; setStats(d); })
+      .catch(e => {
+        if (seq !== seqRef.current) return;
+        setError(e instanceof Error ? e.message : "Could not load stats");
+        setStats(null);
+      })
+      .finally(() => { if (seq === seqRef.current) setLoading(false); });
   }, []);
 
   useEffect(() => { if (statsOpen) load(); }, [statsOpen, load]);
@@ -43,11 +49,11 @@ export default function StatsPanel() {
     <aside className="lib-drawer" role="dialog" aria-label="Stats">
       <div className="lib-head">
         <strong>📊 Stats</strong>
-        <button type="button" className="node-btn" onClick={load} aria-label="Refresh stats">⟳</button>
+        <button type="button" className="node-btn" onClick={load} disabled={loading} aria-label="Refresh stats">⟳</button>
         <button type="button" className="node-btn" onClick={() => setStatsOpen(false)} aria-label="Close stats">✕</button>
       </div>
       <div className="lib-body">
-        {loading && <p className="node-sub">Loading…</p>}
+        {loading && <p className="node-sub" role="status">Loading…</p>}
         {error && <p className="lib-error" role="alert">{error}</p>}
         {stats && (
           <>

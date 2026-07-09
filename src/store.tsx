@@ -45,20 +45,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [libraryPreviewId, setLibraryPreviewIdRaw] = useState<number | null>(null);
   const [snap, setSnap] = useState(true);
   const [weakSpotsOpen, setWeakSpotsOpenRaw] = useState(false);
-  const [statsOpen, setStatsOpen] = useState(false);
-  // Run result, library preview, and weak spots are mutually exclusive panel modes:
-  // opening one closes the others (also guarantees a single Escape listener).
+  const [statsOpen, setStatsOpenRaw] = useState(false);
+  // Run result, library preview, weak spots, and stats are mutually exclusive panel modes:
+  // opening one closes the others (also guarantees a single Escape listener, and avoids
+  // stacking two identical fixed full-height overlays on top of each other).
   const setOpenRunId = useCallback((id: number | null) => {
     setOpenRunIdRaw(id);
-    if (id !== null) { setLibraryPreviewIdRaw(null); setWeakSpotsOpenRaw(false); }
+    if (id !== null) { setLibraryPreviewIdRaw(null); setWeakSpotsOpenRaw(false); setStatsOpenRaw(false); }
   }, []);
   const setLibraryPreviewId = useCallback((id: number | null) => {
     setLibraryPreviewIdRaw(id);
-    if (id !== null) { setOpenRunIdRaw(null); setWeakSpotsOpenRaw(false); }
+    if (id !== null) { setOpenRunIdRaw(null); setWeakSpotsOpenRaw(false); setStatsOpenRaw(false); }
   }, []);
   const setWeakSpotsOpen = useCallback((v: boolean) => {
     setWeakSpotsOpenRaw(v);
-    if (v) { setOpenRunIdRaw(null); setLibraryPreviewIdRaw(null); }
+    if (v) { setOpenRunIdRaw(null); setLibraryPreviewIdRaw(null); setStatsOpenRaw(false); }
+  }, []);
+  const setStatsOpen = useCallback((v: boolean) => {
+    setStatsOpenRaw(v);
+    if (v) { setOpenRunIdRaw(null); setLibraryPreviewIdRaw(null); setWeakSpotsOpenRaw(false); }
   }, []);
   return (
     <Ctx.Provider value={{

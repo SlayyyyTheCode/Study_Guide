@@ -193,3 +193,5 @@ button { font: inherit; cursor: pointer; }
    so it sits inside the floating box instead of the flow container. */
 .minimap-float .react-flow__panel { position: static; margin: 0; }
 .minimap-float .react-flow__minimap { border: 1px solid var(--border); border-radius: 0 0 8px 8px; }
+
+.weakspot-quiz-item { border-top: 1px dashed var(--border); padding: 8px 0; font-size: 13px; }

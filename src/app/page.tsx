@@ -9,6 +9,7 @@ import ResultPanel from "@/components/ResultPanel";
 import LibraryPreviewPanel from "@/components/LibraryPreviewPanel";
 import PomodoroBar from "@/components/PomodoroBar";
 import LibraryDrawer from "@/components/LibraryDrawer";
+import WeakSpotsPanel from "@/components/WeakSpotsPanel";
 
 export default function Home() {
   const runAllRef = useRef<(() => void) | null>(null);
@@ -26,6 +27,7 @@ export default function Home() {
         <ResultPanel />
         <LibraryPreviewPanel />
         <LibraryDrawer />
+        <WeakSpotsPanel />
       </div>
     </AppProvider>
   );

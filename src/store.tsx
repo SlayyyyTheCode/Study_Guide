@@ -23,6 +23,8 @@ interface AppState {
   setLibraryPreviewId: (id: number | null) => void;
   snap: boolean;
   setSnap: (v: boolean) => void;
+  weakSpotsOpen: boolean;
+  setWeakSpotsOpen: (v: boolean) => void;
 }
 
 const Ctx = createContext<AppState | null>(null);
@@ -40,6 +42,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [libraryPreviewId, setLibraryPreviewIdRaw] = useState<number | null>(null);
   const [snap, setSnap] = useState(true);
+  const [weakSpotsOpen, setWeakSpotsOpen] = useState(false);
   // Run result and library preview are mutually exclusive panel modes:
   // opening one closes the other (also guarantees a single Escape listener).
   const setOpenRunId = useCallback((id: number | null) => {
@@ -54,6 +57,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     <Ctx.Provider value={{
       workflowId, setWorkflowId, openRunId, setOpenRunId, openMethod, setOpenMethod, plan, setPlan, brains, setBrains,
       runningOutputs, setRunning, drawerOpen, setDrawerOpen, libraryPreviewId, setLibraryPreviewId, snap, setSnap,
+      weakSpotsOpen, setWeakSpotsOpen,
     }}>
       {children}
     </Ctx.Provider>

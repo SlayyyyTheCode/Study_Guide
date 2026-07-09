@@ -85,6 +85,7 @@ CREATE TABLE IF NOT EXISTS flashcard_reviews (
   next_review_at TEXT,
   last_reviewed TEXT NOT NULL DEFAULT (datetime('now'))
 );
+CREATE INDEX IF NOT EXISTS idx_flashcard_reviews_library_item ON flashcard_reviews(library_item_id);
 `;
 
 /**

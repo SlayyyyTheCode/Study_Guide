@@ -43,9 +43,12 @@ export default function LibraryPreviewPanel() {
     if (!item || item.method !== "flashcards") { setDueCards(null); return; }
     const cards = parseCards(item.content_md);
     if (!cards) { setDueCards(null); return; }
-    fetch(`/api/flashcards?libraryItemId=${item.id}`)
+    const id = item.id;
+    setDueCards(null); // clear any stale previous item's dueCards while this fetch is in flight
+    fetch(`/api/flashcards?libraryItemId=${id}`)
       .then(r => r.ok ? r.json() : [])
       .then((reviews: ReviewRow[]) => {
+        if (previewRef.current !== id) return;
         const nowSql = new Date().toISOString().slice(0, 19).replace("T", " "); // match SQLite datetime('now') format
         const due = cards.filter(c => {
           const r = reviews.find(x => x.front === c.front);
@@ -53,7 +56,7 @@ export default function LibraryPreviewPanel() {
         });
         setDueCards(due.length > 0 ? due : cards);
       })
-      .catch(() => setDueCards(cards));
+      .catch(() => { if (previewRef.current === id) setDueCards(cards); });
   }, [item]);
 
   if (!libraryPreviewId) return null;

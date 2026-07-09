@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
+import { upsertFlashcardResult } from "@/lib/flashcardReviews";
 
 /** GET /api/flashcards?runId=1 or ?libraryItemId=2 → rows with missed counts */
 export async function GET(req: Request) {
@@ -19,36 +20,38 @@ export async function GET(req: Request) {
   return NextResponse.json(rows);
 }
 
-/** POST { runId?|libraryItemId?, results: [{front, back, missed: boolean}] } */
+interface ResultRow { front: string; back: string; missed: boolean; runId?: number; libraryItemId?: number; }
+
+/** POST { runId?|libraryItemId?, results: [{front, back, missed: boolean, runId?, libraryItemId?}] } */
 export async function POST(req: Request) {
   const { runId, libraryItemId, results } = await req.json() as
     { runId?: unknown; libraryItemId?: unknown; results?: unknown };
-  const useRun = typeof runId === "number" && Number.isFinite(runId);
-  const useLib = typeof libraryItemId === "number" && Number.isFinite(libraryItemId);
-  if (!useRun && !useLib)
-    return NextResponse.json({ error: "runId or libraryItemId required" }, { status: 400 });
-  if (!Array.isArray(results) || !results.every(r =>
-    r && typeof r === "object" &&
-    typeof (r as { front?: unknown }).front === "string" && (r as { front: string }).front.trim() !== "" &&
-    typeof (r as { back?: unknown }).back === "string" && (r as { back: string }).back.trim() !== ""
-  ))
-    return NextResponse.json({ error: "results must be an array of {front, back} with non-empty strings" }, { status: 400 });
-  const cards = results as { front: string; back: string; missed?: boolean }[];
+  const topRunId = typeof runId === "number" && Number.isFinite(runId) ? runId : undefined;
+  const topLibId = typeof libraryItemId === "number" && Number.isFinite(libraryItemId) ? libraryItemId : undefined;
+
+  if (!Array.isArray(results) || results.length === 0)
+    return NextResponse.json({ error: "results must be a non-empty array" }, { status: 400 });
+
+  const rows: ResultRow[] = [];
+  for (const r of results) {
+    if (!r || typeof r !== "object")
+      return NextResponse.json({ error: "invalid result row" }, { status: 400 });
+    const front = (r as { front?: unknown }).front;
+    const back = (r as { back?: unknown }).back;
+    if (typeof front !== "string" || front.trim() === "" || typeof back !== "string" || back.trim() === "")
+      return NextResponse.json({ error: "results must be an array of {front, back} with non-empty strings" }, { status: 400 });
+    const rowLibIdRaw = (r as { libraryItemId?: unknown }).libraryItemId;
+    const rowRunIdRaw = (r as { runId?: unknown }).runId;
+    const rowLibId = typeof rowLibIdRaw === "number" && Number.isFinite(rowLibIdRaw) ? rowLibIdRaw : topLibId;
+    const rowRunId = typeof rowRunIdRaw === "number" && Number.isFinite(rowRunIdRaw) ? rowRunIdRaw : topRunId;
+    if (rowLibId === undefined && rowRunId === undefined)
+      return NextResponse.json({ error: "each result needs a runId or libraryItemId (row-level or top-level)" }, { status: 400 });
+    rows.push({ front, back, missed: !!(r as { missed?: unknown }).missed, runId: rowRunId, libraryItemId: rowLibId });
+  }
+
   const db = getDb();
-  const col = useRun ? "run_id" : "library_item_id";
-  const key = useRun ? (runId as number) : (libraryItemId as number);
   db.transaction(() => {
-    for (const r of cards) {
-      const existing = db.prepare(`SELECT id, missed FROM flashcard_reviews WHERE ${col} = ? AND front = ?`).get(key, r.front) as { id: number; missed: number } | undefined;
-      if (existing) {
-        // Refresh back text too, so a regenerated deck doesn't leave stale answers.
-        db.prepare("UPDATE flashcard_reviews SET back = ?, missed = ?, last_reviewed = datetime('now') WHERE id = ?")
-          .run(r.back, r.missed ? existing.missed + 1 : existing.missed, existing.id);
-      } else {
-        db.prepare(`INSERT INTO flashcard_reviews (${col}, front, back, missed) VALUES (?,?,?,?)`)
-          .run(key, r.front, r.back, r.missed ? 1 : 0);
-      }
-    }
+    for (const row of rows) upsertFlashcardResult(db, { runId: row.runId, libraryItemId: row.libraryItemId }, row.front, row.back, row.missed);
   })();
   return NextResponse.json({ ok: true });
 }

@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { useApp, readSse } from "@/store";
-import { parseCards, parseMindmap, parseQuizResults } from "@/lib/parse";
+import { parseCards, parseMindmap, parseQuizResults, stripTrailingJsonBlock } from "@/lib/parse";
 import { METHODS, type MethodId } from "@/lib/prompts";
 
 const FOLLOW_UP_PLACEHOLDERS: Partial<Record<MethodId, string>> = {
@@ -188,9 +188,10 @@ export default function ResultPanel() {
             return <div key={i} className="msg msg-assistant"><FlashcardDeck key={cardsSrc.idx} cards={cardsSrc.cards} runId={openRunId ?? undefined} /></div>;
           if (m.role === "assistant" && mindmapSrc?.idx === idx)
             return <div key={i} className="msg msg-assistant"><MindMapView key={mindmapSrc.idx} map={mindmapSrc.map} /></div>;
+          const displayContent = m.role === "assistant" && openMethod === "quiz" ? stripTrailingJsonBlock(m.content) : m.content;
           return (
             <div key={i} className={`msg msg-${m.role}`}>
-              {m.role === "assistant" ? <ReactMarkdown>{m.content}</ReactMarkdown> : <em>{m.content}</em>}
+              {m.role === "assistant" ? <ReactMarkdown>{displayContent}</ReactMarkdown> : <em>{m.content}</em>}
             </div>
           );
         })}

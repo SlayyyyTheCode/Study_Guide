@@ -31,6 +31,21 @@ export interface QuizResult { id: number; correct: boolean; }
 export function parseQuizResults(md: string): QuizResult[] | null {
   const obj = parseJsonBlock<{ results?: unknown }>(md);
   if (!obj || !Array.isArray(obj.results)) return null;
-  const ok = obj.results.every(r => r && typeof (r as QuizResult).id === "number" && typeof (r as QuizResult).correct === "boolean");
-  return ok ? (obj.results as QuizResult[]) : null;
+  const coerced: QuizResult[] = [];
+  for (const r of obj.results) {
+    if (!r || typeof (r as { correct?: unknown }).correct !== "boolean") return null;
+    const id = Number((r as { id?: unknown }).id);
+    if (Number.isNaN(id)) return null;
+    coerced.push({ id, correct: (r as { correct: boolean }).correct });
+  }
+  return coerced;
+}
+
+/** Strip the LAST ```json fenced block (and any trailing whitespace before it) from display text. No-op if absent. */
+export function stripTrailingJsonBlock(md: string): string {
+  const matches = [...md.matchAll(/```json\s*([\s\S]*?)```/g)];
+  if (matches.length === 0) return md;
+  const last = matches[matches.length - 1];
+  const start = last.index ?? md.length;
+  return md.slice(0, start).replace(/\s+$/, "");
 }

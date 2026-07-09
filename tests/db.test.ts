@@ -65,7 +65,8 @@ describe("db", () => {
     expect(row.ease_factor).toBe(2.5);
     expect(row.interval_days).toBe(0);
     expect(row.repetitions).toBe(0);
-    expect(row.next_review_at).toBeNull();
+    expect(row.next_review_at).toBeTruthy();
+    expect(row.next_review_at).toMatch(new RegExp(`^${new Date().toISOString().slice(0, 10)}`));
 
     raw.close();
   });
